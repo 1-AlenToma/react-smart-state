@@ -14,20 +14,67 @@ I have looked at state management libraries like redux, atom etc and each of the
 npm install --save react-smart-state
 ```
 
-## Usage
+## Usage 
+
+# Local State
 
 ```tsx
-import React, { Component } from 'react'
+import buildState from 'react-smart-state';
 
-import MyComponent from 'react-smart-state'
-import 'react-smart-state/dist/index.css'
-
-class Example extends Component {
-  render() {
-    return <MyComponent />
-  }
+const Counter = () => {
+  const state = buildState({
+        itemA: 0,
+        item: { a: 0 },
+        test: new StateItem()
+}).ignore("item").bind("item.a").build();
+      
+  state.useEffect(() => {
+    
+   // console.error(state);
+  }, "itemA", "item.a")
+  //alert(state.item.a)
+  return (
+    <div>
+      <label>{state.itemA} && {state.item.a} && {state.test.name} </label>
+      <button onClick={() => {
+        state.itemA++;
+        state.item.a++;
+      }}>increase</button>
+    </div>
+  )
 }
 ```
+
+# GlobalState
+
+```tsx
+import buildState from 'react-smart-state';
+
+const state = buildState({
+        itemA: 0,
+        item: { a: 0 },
+        test: new StateItem()
+}).ignore("item").globalBuild();
+const Counter = () => {
+  // for all items change except ignored items
+  state.hook();
+  // or specify items
+  state.hook("itemA","item.a");
+  state.useEffect(() => {
+    
+   // console.error(state);
+  }, "itemA", "item.a")
+  //alert(state.item.a)
+  return (
+    <div>
+      <label>{state.itemA} && {state.item.a} && {state.test.name} </label>
+      <button onClick={() => {
+        state.itemA++;
+        state.item.a++;
+      }}>increase</button>
+    </div>
+  )
+}
 
 ## License
 
