@@ -14,17 +14,18 @@ const Counter = () => {
       }).ignore("item").bind("item.a").build();
       
   state.useEffect(() => {
-    
    // console.error(state);
-  }, "itemA", "item.a")
+  }, "itemA", "item.a", "item")
   //alert(state.item.a)
   return (
     <div>
       <label>{state.itemA} && {state.item.a} && {state.test.name} && counter: {globalState.counter}</label>
       <button onClick={() => {
+      if(state.item.a ==0)
+        state.item = {a:200}
         //state.itemA++;
-        //state.item.a++;
-        globalState.counter++;
+        state.item.a++;
+        //globalState.counter++;
       }}>increase</button>
     </div>
   )

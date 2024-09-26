@@ -115,7 +115,6 @@ class EventTrigger {
                     this.___events[item].keys[key] ||
                     this.___events[item].keys[global]
                 ) {
-
                     if (this.___events[item].fs === undefined) {
                         if (!this.___waitingEvents[item]) {
                             this.___waitingEvents[item] = {
@@ -139,7 +138,7 @@ class EventTrigger {
                 }
             };
             if (this.speed !== undefined) {
-                this.___timer = setTimeout(()=> trigger(), this.speed);
+                this.___timer = setTimeout(() => trigger(), this.speed);
             } else trigger();
         } catch (e) {
             console.error(e);
@@ -237,6 +236,17 @@ class Create<T extends object> extends ICreate {
 
         const parse = (value: any, parentKey: string) => {
             try {
+                let paths = [...parentItem.___events.___addedPaths];
+                for (let pth of paths) {
+                    for (let ks of parentKey.split(".")) {
+                        if (pth.indexOf(ks + ".") !== -1) {
+                            parentItem.___events.___addedPaths =
+                                parentItem.___events.___addedPaths.filter(
+                                    x => x !== pth
+                                );
+                        }
+                    }
+                }
                 if (
                     !ignoreKeys[parentKey] &&
                     valid(value) &&
@@ -276,12 +286,7 @@ class Create<T extends object> extends ICreate {
                     get: () => item[k],
                     set: (value: any) => {
                         item[k] = parse(value, parentKey);
-                        if (!ignoreKeys[parentKey]) {
-                            parentItem.___events.___onChange(
-                                parentKey,
-                                item[k]
-                            );
-                        }
+                        parentItem.___events.___onChange(parentKey, item[k]);
                     }
                 });
             }
