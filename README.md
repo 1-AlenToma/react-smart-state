@@ -75,7 +75,7 @@ const Counter = () => {
     </div>
   )
 }
-
+```
 ## License
 
-MIT © [later](https://github.com/later)
+MIT
