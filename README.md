@@ -76,6 +76,23 @@ const Counter = () => {
   )
 }
 ```
+
+## BuildState Methods 
+| Name | Descriptions |
+| ------------- | ------------- |
+| ignore | Ignore props from proxy this is usefull when you have a big or recrusive items, those could be ignored as it may slow down the application, you will still get notified when setting it but it will ignore its probs. |
+| bind | bind prop in ignored object |
+| build | build the local state |
+| globalBuild | build the global state |
+| timeout | disable settimeout by giving undefined value or specify a number in ms default is 2 ms |
+
+## State additional props
+| Name | Descriptions |
+| ------------- | ------------- |
+| bind | bind prop in ignored object |
+| hook | used to hook changes to a specific component |
+| useEffect | get notify of a change |
+
 ## License
 
 MIT
