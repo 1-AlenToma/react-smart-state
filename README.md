@@ -6,6 +6,8 @@
 
 I have looked at state management libraries like redux, atom etc and each of them takes to much code/work to create and manage, this is why I built this library.
 
+This library also able to handle working in devoloped mode. no need to reload the application each time you change your code.
+
 [![NPM](https://img.shields.io/npm/v/react-smart-state.svg)](https://www.npmjs.com/package/react-smart-state) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
 ## Install
