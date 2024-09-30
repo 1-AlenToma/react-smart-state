@@ -13,7 +13,13 @@ This library also able to handle working in devoloped mode. no need to reload th
 ## Install
 
 ```bash
-npm install --save react-smart-state
+npm install react-smart-state
+```
+
+if you are installing this in `react-native` you will need to also install 
+
+```bash
+npm install react-native-get-random-values
 ```
 
 ## Usage 
