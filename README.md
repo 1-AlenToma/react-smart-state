@@ -21,6 +21,10 @@ if you are installing this in `react-native` you will need to also install
 ```bash
 npm install react-native-get-random-values
 ```
+```
+import 'react-native-get-random-values' at the root
+
+```
 
 ## Usage 
 
