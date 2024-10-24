@@ -1,5 +1,7 @@
+import * as React from "react";
 import { useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+
 
 const refeObject = useRef as any;
 const reactState = useState as any;
@@ -73,10 +75,10 @@ type NestedKeyOf<
     D extends any[] = [0, 0, 0, 0, 0]
 > = D extends [any, ...infer DD]
     ? {
-          [K in keyof T & (string | number)]: T[K] extends object
-              ? `${K}` | `${K}.${NestedKeyOf<T[K], DD>}`
-              : `${K}`;
-      }[keyof T & (string | number)]
+        [K in keyof T & (string | number)]: T[K] extends object
+        ? `${K}` | `${K}.${NestedKeyOf<T[K], DD>}`
+        : `${K}`;
+    }[keyof T & (string | number)]
     : never;
 
 type EventItem = {
