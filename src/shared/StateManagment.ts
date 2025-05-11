@@ -1,11 +1,11 @@
 import * as React from "react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 
 const refeObject = useRef as any;
 const reactState = useState as any;
-//const reactEffect = useEffect as any;
+const reactEffect = useEffect as any;
 function newId() {
     return uuidv4();
 }
@@ -190,6 +190,10 @@ class Create<T extends object> extends ICreate {
             },
             keys: ks.current
         });
+
+        reactEffect(() => {
+            return () => this.___events.remove(id);
+        }, [])
     }
 
     useEffect(fn: Function, ...keys: NestedKeyOf<T>[]) {
@@ -200,6 +204,10 @@ class Create<T extends object> extends ICreate {
             fs: () => fn(this),
             keys: ks.current
         });
+
+        reactEffect(() => {
+            return () => this.___events.remove(id);
+        }, [])
     }
 
     bind(path: string) {

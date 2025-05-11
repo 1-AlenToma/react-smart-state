@@ -1,6 +1,6 @@
 {
   "name": "react-smart-state",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "description": "Next generation local and global state management",
   "author": "Alen Toma",
