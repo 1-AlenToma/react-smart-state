@@ -1,14 +1,46 @@
 import * as React from "react";
 import { useRef, useState, useEffect } from "react";
-import { v4 as uuidv4 } from "uuid";
 
 
-const refeObject = useRef as any;
-const reactState = useState as any;
 const reactEffect = useEffect as any;
-function newId() {
-    return uuidv4();
+const reactRef = useRef as any;
+const reactState = useState as any;
+function updater(): () => void {
+    const [, setValue] = reactState(0);
+
+    return () => {
+        setValue(prev => (prev < 1000 ? prev + 1 : 1));
+    };
 }
+function refCondition<T>(fn: () => T) {
+    const ref = reactRef();
+    if (!ref == undefined)
+        ref.current = fn();
+
+    return { value: ref.current as T, setValue: (value: T) => ref.current = value };
+}
+
+
+
+let ids = new Map();
+let lastDate = new Date();
+
+export const newId = (inc?: string): string => {
+    if ((Date.now() - lastDate.getTime()) > 60 * 1000) {
+        ids = new Map();
+        lastDate = new Date();
+    }
+    let id = (inc ?? "") + Date.now().toString(36) + Math.floor(1e12 + Math.random() * 9e12).toString(36);
+
+    if (ids.has(id)) {
+        // Retry without prefix to avoid exponential growth
+        return newId();
+    }
+    ids.set(id, id);
+    return id;
+}
+
+
 
 const toObject = (...keys: string[]) => {
     if (keys.length === 0) return { AllKeys: true };
@@ -89,58 +121,58 @@ type EventItem = {
 };
 
 class EventTrigger {
-    ___events: any = {};
-    ___timer: any = undefined;
-    ___waitingEvents: any = {};
-    ___addedPaths: string[] = [];
+    _events: any = {};
+    _timer: any = undefined;
+    _waitingEvents: any = {};
+    _addedPaths: string[] = [];
     speed?: number = 2;
 
-    add(id: string, item: EventItem) {
-        this.___events[id] = item;
+    _add(id: string, item: EventItem) {
+        this._events[id] = item;
     }
 
-    remove(id: string) {
-        delete this.___events[id];
+    _remove(id: string) {
+        delete this._events[id];
     }
 
-    async ___onChange(key: string, parentItem: any) {
+    async _onChange(key: string, parentItem: any) {
         try {
-            clearTimeout(this.___timer);
+            clearTimeout(this._timer);
             let global = key
                 .split(".")
                 .reverse()
                 .filter((x, i) => i > 0)
                 .join(".");
-            for (let item in this.___events) {
+            for (let item in this._events) {
+                let eventItem = this._events[item];
                 if (
-                    this.___events[item].keys.AllKeys ||
-                    this.___events[item].keys[key] ||
-                    this.___events[item].keys[global]
+                    eventItem.keys.AllKeys ||
+                    eventItem.keys[key] ||
+                    eventItem.keys[global]
                 ) {
-                    if (this.___events[item].fs === undefined) {
-                        if (!this.___waitingEvents[item]) {
-                            this.___waitingEvents[item] = {
-                                event: this.___events[item],
-                                items: new Map()
-                            };
-                        }
-                        this.___waitingEvents[item].items.set(key, {
+                    if (eventItem.fs === undefined) {
+                        let waitingItems = (this._waitingEvents[item] ?? (this._waitingEvents[item] = {
+                            event: eventItem,
+                            items: new Map()
+                        })).items;
+
+                        waitingItems.set(key, {
                             key: key,
                             item: parentItem
                         });
-                    } else this.___events[item].fs();
+                    } else eventItem.fs();
                 }
             }
 
             const trigger = () => {
-                let items = { ...this.___waitingEvents };
-                this.___waitingEvents = {};
+                let items = { ...this._waitingEvents };
+                this._waitingEvents = {};
                 for (let item in items) {
                     items[item].event.fn(items[item].items);
                 }
             };
             if (this.speed !== undefined) {
-                this.___timer = setTimeout(() => trigger(), this.speed);
+                this._timer = setTimeout(() => trigger(), this.speed);
             } else trigger();
         } catch (e) {
             console.error(e);
@@ -149,96 +181,163 @@ class EventTrigger {
 }
 
 abstract class ICreate {
-    abstract ___events: EventTrigger;
+    abstract _events: EventTrigger;
 }
 
 type ReturnState<T extends object> = {
     hook(...keys: NestedKeyOf<T>[]): void;
     useEffect(fn: Function, ...keys: NestedKeyOf<T>[]): void;
     bind(path: string): void;
+    unbind(path: string): void;
+    localBind(path: string): void;
 };
 class Create<T extends object> extends ICreate {
-    ___events: EventTrigger = new EventTrigger();
+    _events: EventTrigger = new EventTrigger();
 
     hook(...keys: NestedKeyOf<T>[]) {
-        let id = refeObject(newId()).current;
-        let ks = refeObject();
-        if (!ks.current) ks.current = toObject(...keys);
+        let id = refCondition<string>(newId).value;
+        let keysObject = refCondition(() => toObject(...keys)).value
         let [update, setUpdate] = reactState();
-        this.___events.add(id, {
+        this._events._add(id, {
             fn: items => {
                 if (!update) {
                     setUpdate(
-                        Object.keys(ks.current).reduce((c, v) => {
+                        Object.keys(keysObject).reduce((c, v) => {
                             c[v] = items.get(v)?.item;
                             return c;
                         }, {})
                     );
                 } else {
-                    let a = { ...update };
-                    let refresh = false;
-                    for (let item of [...items.values()]) {
-                        if (a[item.key] !== item.item) {
-                            refresh = true;
-                            a[item.key] = item.item;
+                    const updatedState = { ...update };
+                    let hasChanges = false;
+
+                    for (const { key, item } of items.values()) {
+                        if (updatedState[key] !== item) {
+                            hasChanges = true;
+                            updatedState[key] = item;
                         }
                     }
-                    if (refresh) {
-                        setUpdate(a);
+                    if (hasChanges) {
+                        setUpdate(updatedState);
                     }
                 }
             },
-            keys: ks.current
+            keys: keysObject
         });
 
         reactEffect(() => {
-            return () => this.___events.remove(id);
+            return () => this._events._remove(id);
         }, [])
     }
 
     useEffect(fn: Function, ...keys: NestedKeyOf<T>[]) {
-        let id = refeObject(newId()).current;
-        let ks = refeObject();
-        if (!ks.current) ks.current = toObject(...keys);
-        this.___events.add(id, {
+        let id = refCondition<string>(newId).value;
+        let keysObject = refCondition(() => toObject(...keys)).value;
+        this._events._add(id, {
             fs: () => fn(this),
-            keys: ks.current
+            keys: keysObject
         });
 
         reactEffect(() => {
-            return () => this.___events.remove(id);
+            return () => this._events._remove(id);
         }, [])
     }
 
-    bind(path: string) {
-        if (this.___events.___addedPaths.includes(path)) return;
-        this.___events.___addedPaths.push(path);
-        let item = this;
-        let key = path.split(".").reverse()[0];
-        for (let p of path.split(".")) {
-            if (typeof item[p] === "object") {
-                item = item[p];
-            } else break;
-        }
-        let v = item[key];
-        Object.defineProperty(item, key, {
-            enumerable: true,
-            configurable: true,
-            get: () => v,
-            set: (value: any) => {
-                if (value !== v) {
-                    v = value;
-                    this.___events.___onChange(path, v);
-                }
+    unbind(path: string, islocal?: boolean) {
+        try {
+            const index = this._events._addedPaths.indexOf(path);
+            if (index === -1 && !islocal) return; // not bound, do nothing
+            if (index !== -1)
+                this._events._addedPaths.splice(index, 1);
+            let item = this;
+            let key = path.split(".").reverse()[0];
+            for (let p of path.split(".")) {
+                if (typeof item[p] === "object") {
+                    item = item[p];
+                } else break;
             }
-        });
+            if (item) {
+                let v = item[key];
+                delete item[key];
+                item[key] = v;
+            }
+
+
+        } catch (e) {
+            console.warn("was unable to unbind ", path, e)
+        }
+    }
+
+    localBind(path: string) {
+        const update = updater();
+        const init = reactRef(false);
+        if (!init.current) {
+            init.current = true;
+            let item = this;
+            let key = path.split(".").reverse()[0];
+            for (let p of path.split(".")) {
+                if (typeof item[p] === "object") {
+                    item = item[p];
+                } else break;
+            }
+            let v = item[key];
+            Object.defineProperty(item, key, {
+                enumerable: true,
+                configurable: true,
+                get: () => v,
+                set: (value: any) => {
+                    if (value !== v) {
+                        v = value;
+                        update();
+                    }
+                }
+            });
+        }
+
+        reactEffect(() => {
+            return () => {
+                this.unbind(path, true);
+            }
+        }, [])
+    }
+
+
+    bind(path: string) {
+        if (!this._events._addedPaths.includes(path)) {
+            this._events._addedPaths.push(path);
+            let item = this;
+            let key = path.split(".").reverse()[0];
+            for (let p of path.split(".")) {
+                if (typeof item[p] === "object") {
+                    item = item[p];
+                } else break;
+            }
+            let v = item[key];
+            Object.defineProperty(item, key, {
+                enumerable: true,
+                configurable: true,
+                get: () => v,
+                set: (value: any) => {
+                    if (value !== v) {
+                        v = value;
+                        this._events._onChange(path, v);
+                    }
+                }
+            });
+        }
+
+        reactEffect(() => {
+            return () => {
+                this.unbind(path);
+            }
+        }, [])
     }
 
     constructor(item: any, parent: any, parentItem: any, ignoreKeys: any) {
         super();
         if (parentItem === undefined) {
             parentItem = this;
-        } else delete this.___events;
+        } else delete this._events;
         let parentKeys = (key: string) => {
             if (parent && parent.length > 0) return `${parent}.${key}`;
             return key;
@@ -246,12 +345,12 @@ class Create<T extends object> extends ICreate {
 
         const parse = (value: any, parentKey: string) => {
             try {
-                let paths = [...parentItem.___events.___addedPaths];
+                let paths = [...parentItem._events._addedPaths];
                 for (let pth of paths) {
                     for (let ks of parentKey.split(".")) {
                         if (pth.indexOf(ks + ".") !== -1) {
-                            parentItem.___events.___addedPaths =
-                                parentItem.___events.___addedPaths.filter(
+                            parentItem._events._addedPaths =
+                                parentItem._events._addedPaths.filter(
                                     x => x !== pth
                                 );
                         }
@@ -296,7 +395,7 @@ class Create<T extends object> extends ICreate {
                     get: () => item[k],
                     set: (value: any) => {
                         item[k] = parse(value, parentKey);
-                        parentItem.___events.___onChange(parentKey, item[k]);
+                        parentItem._events._onChange(parentKey, item[k]);
                     }
                 });
             }
@@ -311,6 +410,7 @@ class StateBuilder<T extends object> {
     initilized?: Create<T>;
     ignoreKeys: string[] = [];
     bindKeys: string[] = [];
+    localBindKeys: string[] = [];
     timeoutSpeed?: number = 2;
     constructor(item: any) {
         this.item = item;
@@ -329,7 +429,9 @@ class StateBuilder<T extends object> {
     this is usefull when you have a big or recrusive object, those could be ignored as it may slow down the application
     */
     ignore(...ignoreKeys: NestedKeyOf<T>[]) {
-        for (let key of ignoreKeys) this.ignoreKeys.push(key);
+        for (let key of ignoreKeys)
+            if (!this.ignoreKeys.includes(key))
+                this.ignoreKeys.push(key);
 
         return this;
     }
@@ -338,7 +440,20 @@ class StateBuilder<T extends object> {
     bind prop in ignored object
     */
     bind(...bindKeys: NestedKeyOf<T>[]) {
-        for (let key of bindKeys) this.bindKeys.push(key);
+        for (let key of bindKeys)
+            if (!this.bindKeys.includes(key))
+                this.bindKeys.push(key);
+
+        return this;
+    }
+
+    /*
+    localbind prop in ignored object
+    */
+    localBind(...bindKeys: NestedKeyOf<T>[]) {
+        for (let key of bindKeys)
+            if (!this.localBindKeys.includes(key))
+                this.localBindKeys.push(key);
 
         return this;
     }
@@ -347,11 +462,7 @@ class StateBuilder<T extends object> {
     build the local state
     */
     build() {
-        let refItem = refeObject();
-        if (refItem.current === undefined) {
-            refItem.current = this;
-        }
-        const $this = refItem.current;
+        const $this = refCondition<this>(() => this).value;
         if ($this.initilized === undefined) {
             $this.initilized = new Create(
                 $this.item,
@@ -359,13 +470,17 @@ class StateBuilder<T extends object> {
                 undefined,
                 toObject(...$this.ignoreKeys)
             ) as any;
-            $this.initilized.___events.speed = $this.timeoutSpeed;
+            $this.initilized._events.speed = $this.timeoutSpeed;
         }
 
         $this.initilized.hook();
 
         for (let key of $this.bindKeys) {
             $this.initilized.bind(key);
+        }
+
+        for (let key of $this.localBindKeys) {
+            $this.initilized.localBind(key);
         }
 
         return $this.initilized as any as ReturnState<T> & T;

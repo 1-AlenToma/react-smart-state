@@ -1,6 +1,6 @@
 {
   "name": "react-smart-state",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "description": "Next generation local and global state management",
   "author": "Alen Toma",
@@ -35,7 +35,6 @@
     "src"
   ],
   "dependencies": {
-    "react": "*",
-    "uuid": "^10.0.0"
+    "react": "*"
   }
 }
