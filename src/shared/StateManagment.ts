@@ -12,6 +12,14 @@ function updater(): () => void {
         setValue(prev => (prev < 1000 ? prev + 1 : 1));
     };
 }
+
+function getItem(item: any) {
+    if (!item)
+        throw "item cannot be undefined or null";
+    if (typeof item === "function")
+        return getItem(item());
+    return item;
+}
 function refCondition<T>(fn: () => T) {
     const ref = reactRef(undefined);
     if (ref.current == undefined)
@@ -415,13 +423,13 @@ class Create<T extends object> extends ICreate {
 }
 
 class StateBuilder<T extends object> {
-    item: any;
+    item: T | (() => T);
     initilized?: Create<T>;
     ignoreKeys: string[] = [];
     bindKeys: string[] = [];
     localBindKeys: string[] = [];
     timeoutSpeed?: number = 2;
-    constructor(item: any) {
+    constructor(item: T | (() => T)) {
         this.item = item;
     }
 
@@ -474,7 +482,7 @@ class StateBuilder<T extends object> {
         const $this = refCondition<this>(() => this).value;
         if ($this.initilized === undefined) {
             $this.initilized = new Create(
-                $this.item,
+                getItem($this.item),
                 undefined,
                 undefined,
                 toObject(...$this.ignoreKeys)
@@ -501,7 +509,7 @@ class StateBuilder<T extends object> {
     globalBuild() {
         if (this.initilized === undefined) {
             this.initilized = new Create(
-                this.item,
+                getItem(this.item),
                 undefined,
                 undefined,
                 toObject(...this.ignoreKeys)
@@ -512,7 +520,7 @@ class StateBuilder<T extends object> {
     }
 }
 
-const StateInit = <T extends object>(item: T) => {
+const StateInit = <T extends object>(item: T | (() => T)) => {
     return new StateBuilder<T>(item);
 };
 
