@@ -43,12 +43,12 @@ export const newId = (inc?: string): string => {
 
 
 const toObject = (...keys: string[]) => {
-    if (keys.length === 0) return { AllKeys: true };
+    if (keys.length === 0) return { AllKeys: true } as Record<string, boolean>;
 
     return keys.reduce((c, v) => {
         c[v] = true;
         return c;
-    }, {} as any);
+    }, {} as Record<string, boolean>);
 };
 
 function getPrototypeChain(obj) {
@@ -121,10 +121,11 @@ type EventItem = {
 };
 
 class EventTrigger {
-    _events: any = {};
+    _events: Record<string, { keys: Record<string, boolean>, fs?: Function, fn?: Function }> = {};
     _timer: any = undefined;
     _waitingEvents: any = {};
     _addedPaths: string[] = [];
+    _localBindedEvents: Record<string, Map<string, Function>> = {};
     speed?: number = 2;
 
     _add(id: string, item: EventItem) {
@@ -189,7 +190,7 @@ type ReturnState<T extends object> = {
     useEffect(fn: Function, ...keys: NestedKeyOf<T>[]): void;
     bind(path: string): void;
     unbind(path: string): void;
-    localBind(path: string): void;
+    localBind(path: string, updateOn?: (newValue: any) => boolean): void;
 };
 class Create<T extends object> extends ICreate {
     _events: EventTrigger = new EventTrigger();
@@ -268,11 +269,11 @@ class Create<T extends object> extends ICreate {
         }
     }
 
-    localBind(path: string) {
-        const update = updater();
-        const init = reactRef(false);
-        if (!init.current) {
-            init.current = true;
+    localBind(path: string, updateOn?: (newValue: any) => boolean) {
+        const [_, setValue] = reactState();
+        const id = refCondition(newId).value;
+        if (!this._events._localBindedEvents[path]) {
+            this._events._localBindedEvents[path] = new Map<string, Function>();
             let item = this;
             let key = path.split(".").reverse()[0];
             for (let p of path.split(".")) {
@@ -280,23 +281,34 @@ class Create<T extends object> extends ICreate {
                     item = item[p];
                 } else break;
             }
-            let v = item[key];
-            Object.defineProperty(item, key, {
-                enumerable: true,
-                configurable: true,
-                get: () => v,
-                set: (value: any) => {
-                    if (value !== v) {
-                        v = value;
-                        update();
+            if (item) {
+                let v = item[key];
+                Object.defineProperty(item, key, {
+                    enumerable: true,
+                    configurable: true,
+                    get: () => v,
+                    set: (value: any) => {
+                        if (value !== v) {
+                            v = value;
+                            if (!updateOn || updateOn(v))
+                                this._events._localBindedEvents[path]?.forEach(func => func(value));
+
+                        }
                     }
-                }
-            });
+                });
+            }
         }
+
+        this._events._localBindedEvents[path]?.set(id, setValue)
 
         reactEffect(() => {
             return () => {
-                this.unbind(path, true);
+                this._events._localBindedEvents[path]?.delete(id);
+                if (!this._events._localBindedEvents[path] || this._events._localBindedEvents[path].size <= 0) {
+                    if (this._events._localBindedEvents[path])
+                        delete this._events._localBindedEvents[path];
+                    this.unbind(path, true);
+                }
             }
         }, [])
     }
@@ -312,18 +324,21 @@ class Create<T extends object> extends ICreate {
                     item = item[p];
                 } else break;
             }
-            let v = item[key];
-            Object.defineProperty(item, key, {
-                enumerable: true,
-                configurable: true,
-                get: () => v,
-                set: (value: any) => {
-                    if (value !== v) {
-                        v = value;
-                        this._events._onChange(path, v);
+
+            if (item) {
+                let v = item[key];
+                Object.defineProperty(item, key, {
+                    enumerable: true,
+                    configurable: true,
+                    get: () => v,
+                    set: (value: any) => {
+                        if (value !== v) {
+                            v = value;
+                            this._events._onChange(path, v);
+                        }
                     }
-                }
-            });
+                });
+            }
         }
     }
 
