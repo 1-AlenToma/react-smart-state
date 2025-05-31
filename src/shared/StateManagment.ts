@@ -13,8 +13,8 @@ function updater(): () => void {
     };
 }
 function refCondition<T>(fn: () => T) {
-    const ref = reactRef();
-    if (!ref == undefined)
+    const ref = reactRef(undefined);
+    if (ref.current == undefined)
         ref.current = fn();
 
     return { value: ref.current as T, setValue: (value: T) => ref.current = value };
@@ -325,12 +325,6 @@ class Create<T extends object> extends ICreate {
                 }
             });
         }
-
-        reactEffect(() => {
-            return () => {
-                this.unbind(path);
-            }
-        }, [])
     }
 
     constructor(item: any, parent: any, parentItem: any, ignoreKeys: any) {
