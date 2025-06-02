@@ -83,7 +83,7 @@ const TestSmartState = () => {
     test: new StateItem(),
     derived: 0
   }).onInit(fetch)
-    .ignore("test.counter") // test .ignore()
+    .ignore("test.counter", "item") // test .ignore()
     .localBind("item.a", "test.counter") // bind local values
     .build();
 
@@ -121,8 +121,11 @@ const TestSmartState = () => {
         onClick={() => {
 
           // Update local state
-          state.itemA++;
+
+          state.item = state.item;
           state.item.a++;
+          return;
+          state.itemA++;
           state.test.counter++;
           // Reset logic
           if (state.test.counter === 5) {
@@ -135,8 +138,7 @@ const TestSmartState = () => {
             globalState.shared += 2;*/
 
           // Test rerender-triggering same reference
-          state.item = state.item;
-          state.item.a++;
+
 
           // Reset state when a threshold is hit
           if (state.itemA >= 8) {

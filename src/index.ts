@@ -112,16 +112,20 @@ const keys = (item: any) => {
     // alert(JSON.stringify(ks, undefined, 4));
     return ks;
 };
-/*
+
 const getValueByPath = (value: any, path: string) => {
+    if (!path) return value;
+    const segments = path.split(".");
+
     let current = value;
-    for (let item of path.split(".")) {
-        current = current[item];
+    for (const key of segments) {
+        if (current == null || current == undefined) return undefined; // handles null and undefined
+        current = current[key];
     }
 
     return current;
 };
-*/
+
 export const valid = (item: any, validArray?: boolean) => {
     if (item == undefined || item === null) return false;
     if (item instanceof Set) return false;
@@ -257,8 +261,9 @@ export class FastList<T, Key extends string | number | symbol = string> {
 type StateType = "Local" | "Global";
 type LocalEvent = {
     bending?: boolean;
-    bendingValue?: undefined
+    bendingValue?: undefined;
     func: Function;
+    redefineItem?: boolean;
 }
 
 export class EventTrigger {
@@ -293,6 +298,15 @@ export class EventTrigger {
 
     }
 
+    triggerLocalBindingChanges() {
+        // execute all bending items
+        this._localBindedEvents.values.flatMap(x => x.values.filter(f => f.bending == true)).forEach(x => {
+            x.bending = false;
+            x.func(x.bendingValue);
+            x.bendingValue = undefined;
+        });
+    }
+
     async triggerSavedChanges() {
         clearTimeout(this._timer); // Proper debouncing
         if (this._batching._length > 0)
@@ -317,12 +331,7 @@ export class EventTrigger {
                 runHandlers(item.event, item.items.records());
             }
 
-            // execute all bending items
-            this._localBindedEvents.values.flatMap(x => x.values.filter(f => f.bending == true)).forEach(x => {
-                x.bending = false;
-                x.func(x.bendingValue);
-                x.bendingValue = undefined;
-            });
+            this.triggerLocalBindingChanges();
         });
     }
 
@@ -346,11 +355,12 @@ export class EventTrigger {
         try {
             clearTimeout(this._timer); // Proper debouncing
             // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
-
+            let called = false;
             const parts = key.split(".");
             for (const [eventId, event] of Object.entries(this._events)) {
                 if (event.keys.AllKeys || event.keys[key]) {
                     this._trigger({ eventId, event }, key, oldValue, newValue);
+                    called = true;
                     continue;
                 }
 
@@ -359,10 +369,14 @@ export class EventTrigger {
                     const parentKey = parts.slice(0, i).join(".");
                     if (event.keys[parentKey]) {
                         this._trigger({ eventId, event }, key, oldValue, newValue);
+                        called = true;
                         break; // stop at the first match for performance
                     }
                 }
             }
+
+            if (!called && this._batching._length <= 0)
+                this.triggerLocalBindingChanges();
         } catch (e) {
             console.error(e);
         }
@@ -565,14 +579,15 @@ class Create<T extends object> {
         }, [])
     }
 
-    unbind(path: string, islocal?: boolean) {
+    unbind(path: string, islocal?: boolean, redefineItem?: boolean) {
         try {
             if (!this.#_events._addedPaths.has(path) && !islocal) return; // not bound, do nothing
-            this.#_events._addedPaths.delete(path);
+            if (!redefineItem)
+                this.#_events._addedPaths.delete(path);
             let item = this;
             let key = path.split(".").reverse()[0];
             for (let p of path.split(".")) {
-                if (typeof item[p] === "object") {
+                if (item[p] !== null && typeof item[p] === "object") {
                     item = item[p];
                 } else break;
             }
@@ -594,26 +609,29 @@ class Create<T extends object> {
         const [_, setValue] = reactState();
         const id = refCondition(newId).value;
         const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
-        if (!this.#_events._localBindedEvents.has(path)) {
-            this.#_events._localBindedEvents.set(path, new FastList<LocalEvent>);
+        const cValue = refCondition(() => getValueByPath(this, path))
+        if (!this.#_events._localBindedEvents.has(path) || this.#_events._localBindedEvents.get(path)?.get(id)?.redefineItem) {
+            if (this.#_events._localBindedEvents.has(path))
+                this.unbind(path, true, true);
+            if (!this.#_events._localBindedEvents.has(path))
+                this.#_events._localBindedEvents.set(path, new FastList<LocalEvent>);
             let item = this;
             let key = path.split(".").reverse()[0];
             for (let p of path.split(".")) {
-                if (typeof item[p] === "object") {
+                if (item[p] !== null && typeof item[p] === "object") {
                     item = item[p];
                 } else break;
             }
 
             if (item) {
-                let v = item[key];
                 Object.defineProperty(item, key, {
                     enumerable: true,
                     configurable: true,
-                    get: () => v,
+                    get: () => cValue.value,
                     set: (value: any) => {
-                        if (value !== v) {
-                            v = value;
-                            if (!hookSettings.on || hookSettings.on(this)) {
+                        if (value !== cValue.value) {
+                            cValue.setValue(value);
+                            if ((!hookSettings.on || hookSettings.on(this)) && this.#_events._localBindedEvents.get(path)) {
                                 if (this.#_events._batching) {
                                     this.#_events._localBindedEvents.get(path).get(id).bending = true;
                                     this.#_events._localBindedEvents.get(path).get(id).bendingValue = value;
@@ -628,7 +646,12 @@ class Create<T extends object> {
             }
         }
 
-        this.#_events._localBindedEvents.get(path)?.append(id, { func: setValue });
+        this.#_events._localBindedEvents.get(path)?.append(id, {
+            func: (value: any) => {
+                setValue(value);
+            },
+            redefineItem: false
+        });
 
         reactEffect(() => {
             return () => {
@@ -779,7 +802,12 @@ class Create<T extends object> {
                                     if (parentItem.getEvent()._localBindedEvents.hasValue)
                                         parentItem.getEvent()._localBindedEvents.keys.forEach((addedKey) => {
                                             if (addedKey.startsWith(pKey + ".") || addedKey === pKey) {
-                                                parentItem.getEvent()._localBindedEvents.delete(addedKey);
+                                                if (parentItem.getEvent()._localBindedEvents.get(addedKey)?.hasValue)
+                                                    for (let item of parentItem.getEvent()._localBindedEvents.get(addedKey).values) {
+                                                        item.bending = true;
+                                                        item.bendingValue = getValueByPath(this, addedKey);
+                                                        item.redefineItem = true;
+                                                    }
                                             }
                                         });
                                 }
