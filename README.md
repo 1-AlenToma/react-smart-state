@@ -120,6 +120,7 @@ await state.batch(async () => {
   await someAsyncCall();
   state.c = 3;
 });
+// components only updates once, after the batch is done
 ```
 
 ### `hook().on`
