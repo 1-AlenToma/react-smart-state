@@ -1,7 +1,6 @@
 {
   "name": "react-smart-state",
   "version": "1.0.7",
-  "type": "module",
   "description": "Next generation local and global state management",
   "author": "Alen Toma",
   "license": "MIT",
@@ -9,8 +8,14 @@
     "type": "git",
     "url": "git+https://github.com/1-AlenToma/react-smart-state.git"
   },
-  "main": "./dist/index.js",
-  "source": "./src/index.ts",
+  "source": "src/index.ts",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    "require": "./dist/cjs/index.js",
+    "import": "./dist/esm/index.js"
+  },
   "keywords": [
     "state",
     "usestate",
@@ -21,14 +26,17 @@
     "node": ">=10"
   },
   "scripts": {
-    "prepack": "tsc",
-    "build": "tsc"
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build": "rmdir /s /q dist && npm run build:cjs && npm run build:esm",
+    "start": "npm run build && cd example && npm run start",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "react": "*"
   },
   "devDependencies": {
-    "typescript": "*"
+    "typescript": "^5.8.3"
   },
   "files": [
     "dist",

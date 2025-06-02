@@ -1,25 +1,31 @@
 class A {
-  text:string="test";
-  
-  getText(){
+  text: string = "test";
+  counter: number = 1;
+
+  getText() {
     return this.text;
   }
 }
 
 class B extends A {
   userName: string = "Alen";
-  
-  get name(){
+  selfRef: B;
+  constructor() {
+    super();
+    this.selfRef = this;
+  }
+
+  get name() {
     return this.userName + " " + this.getText();
   }
-  
-  set name(name:string){
+
+  set name(name: string) {
     this.userName = name;
   }
 }
 
 class C extends B {
-  fetchData(){
+  fetchData() {
     return JSON.stringify(this);
   }
 }

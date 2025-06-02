@@ -16,16 +16,6 @@ This library also able to handle working in devoloped mode. no need to reload th
 npm install react-smart-state
 ```
 
-if you are installing this in `react-native` you will need to also install 
-
-```bash
-npm install react-native-get-random-values
-```
-```
-import 'react-native-get-random-values' at the root
-
-```
-
 ## Usage 
 
 # Local State
@@ -71,9 +61,14 @@ const Counter = () => {
   // for all items change except ignored items
   state.hook();
   // or specify items
-  state.hook("itemA","item.a");
+  state.hook("itemA");
+
+  // if you want to bind an item in ignore item then 
+  state.bind("item.a") // then add its hook state.hook("item.a")
+  // or 
+  state.localBind("item.a") // this will only bind it in the current component
+
   state.useEffect(() => {
-    
    // console.error(state);
   }, "itemA", "item.a")
   //alert(state.item.a)
@@ -93,16 +88,21 @@ const Counter = () => {
 | Name | Descriptions |
 | ------------- | ------------- |
 | ignore | Ignore props from proxy this is usefull when you have a big or recrusive items, those could be ignored as it may slow down the application, you will still get notified when setting it but it will ignore its probs. |
-| bind | bind prop in ignored object |
+| bind | bind prop in ignored object, this work globlly|
+| unbind | unbind binded prop |
+| localBind | bind prop in ignored object, this only work locally eg for the component that is exist in |
 | build | build the local state |
 | globalBuild | build the global state |
-| timeout | disable settimeout by giving undefined value or specify a number in ms default is 2 ms |
+| timeout | disable settimeout by giving undefined value or specify a number in ms default is 2 ms for globalBuild and undefiend for build |
 
 ## State additional props
 | Name | Descriptions |
 | ------------- | ------------- |
-| bind | bind prop in ignored object |
+| bind | bind prop in ignored object, this work globlly|
+| unbind | unbind binded prop |
+| localBind | bind prop in ignored object, this only work locally eg for the component that is exist in |
 | hook | used to hook changes to a specific component |
+| hook().on | trigger update with condition eg hook("counter").on(x=> x.counter >3) |
 | useEffect | get notify of a change |
 
 ## License
