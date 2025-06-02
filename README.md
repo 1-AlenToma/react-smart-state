@@ -73,7 +73,7 @@ const Counter = () => {
     nested: { value: 0 }
   })
     .ignore("nested")
-    .localBind("nested.value", "localCount")
+    .localBind("nested.value")
     .build();
 
   state.useEffect(() => {
