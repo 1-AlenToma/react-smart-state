@@ -68,6 +68,7 @@ const globalState = buildState({
 }).timeout(undefined).globalBuild();
 
 const Counter = () => {
+  globalState.hook("counter")
   const state = buildState({
     localCount: 0,
     nested: { value: 0 }
