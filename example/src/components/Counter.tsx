@@ -52,49 +52,104 @@ const display = (item: any, seen = new WeakSet(), indent = 0): string => {
 };
 
 
+// Global state
+const globalState = buildState({
+  counter: 1,
+  item: { counter: 1 },
+  shared: 0
+})
+  .timeout(undefined)
+  .globalBuild();
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const fetch = async (g) => {
+  let item = new StateItem();
+  item.name = "hahaha";
+  item.counter = 1005;
+  await sleep(1000);
+  g.test = item;
+}
 
-let globalState = buildState({
-  counter: 2,
-  item: { counter: 2 }
-}).timeout(undefined).globalBuild();
-const Counter = () => {
-  globalState.hook("item").on(x => x.item.counter > 3);
-  //state.bind("item.a")
+// Component
+const TestSmartState = () => {
+  // Hook usage for reaction (e.g., logging or effects)
+  globalState.hook("item").on(g => g.item.counter >= 3);
+
+  // Local state
   const state = buildState({
     itemA: 0,
     item: { a: 0 },
-    test: new StateItem()
-  }).ignore("test.counter").localBind("item.a", "test.counter").build();
+    test: new StateItem(),
+    derived: 0
+  }).onInit(fetch)
+    .ignore("test.counter") // test .ignore()
+    .localBind("item.a", "test.counter") // bind local values
+    .build();
 
+  const cmValue = state.useComputed((g, current) => {
+    let v = g.itemA + 10 + g.test.counter;
+    return v;
+  }, "itemA", "test.counter");
 
+  // Side effect on a field
   state.useEffect(() => {
-    //console.error(state);
-  }, "itemA")
+    console.log("itemA changed to", state.itemA);
+  }, "itemA");
+
+  // Derived update effect
+  state.useEffect(() => {
+    //alert(44)
+    state.derived = state.itemA + state.test.counter;
+  }, "itemA", "test.counter");
+
+  // Global state reaction
+  globalState.useEffect(() => {
+    console.log("Global counter changed:", globalState.counter);
+  }, "counter");
 
   return (
-    <div>
-      <label>state:{display(state)}</label>
-      <br />
-      <label>globalState:{display(globalState)}</label>
-      <button onClick={() => {
+    <div style={{ fontFamily: "monospace" }}>
+      <h3>Local State</h3>
+      <pre>{display(state)}</pre>
+      <h3>Global State</h3>
+      <pre>{display(globalState)}</pre>
+      <h3>cmValue</h3>
+      <pre>{display({ cmValue })}</pre>
 
-        state.itemA++;
-        state.item.a++;
-        if (state.test.counter == 5)
-          state.test = new StateItem();
-        globalState.counter++;
-        globalState.item.counter++;
-        state.test.counter++
+      <button
+        onClick={() => {
 
-        state.item = state.item;
-        state.item.a++;
-        if (state.itemA == 6)
-          state.resetState();
-      }}>increase</button>
-    </div >
-  )
-}
+          // Update local state
+          state.itemA++;
+          state.item.a++;
+          state.test.counter++;
+          // Reset logic
+          if (state.test.counter === 5) {
+            state.test = new StateItem(); // Replace ignored object
+          }
 
-export default Counter;
+          // Update global state
+          /**   globalState.counter++;
+            globalState.item.counter++;
+            globalState.shared += 2;*/
+
+          // Test rerender-triggering same reference
+          state.item = state.item;
+          state.item.a++;
+
+          // Reset state when a threshold is hit
+          if (state.itemA >= 8) {
+            state.resetState();
+          }
+          // await sleep(1000)
+
+        }}
+      >
+        increase
+      </button>
+    </div>
+  );
+};
+
+export default TestSmartState;
