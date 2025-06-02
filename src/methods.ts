@@ -1,0 +1,123 @@
+import { useRef, useState, useEffect } from "react";
+export const reactEffect = useEffect as any;
+export const reactRef = useRef as any;
+export const reactState = useState as any;
+export function updater() {
+    const [value, setValue] = reactState(0);
+
+    return ({
+        value,
+        refresh: () => {
+            setValue(prev => (prev < 1000 ? prev + 1 : 1));
+        }
+    });
+}
+
+let ids = new Map();
+let lastDate = new Date();
+export const newId = (inc?: string): string => {
+    if ((Date.now() - lastDate.getTime()) > 60 * 1000) {
+        ids = new Map();
+        lastDate = new Date();
+    }
+    let id = (inc ?? "") + Date.now().toString(36) + Math.floor(1e12 + Math.random() * 9e12).toString(36);
+
+    if (ids.has(id)) {
+        // Retry without prefix to avoid exponential growth
+        return newId();
+    }
+
+    if (ids.size >= 1000)
+        ids.clear();
+    ids.set(id, id);
+    return id;
+}
+
+
+export function isPromise(obj: any): obj is Promise<any> {
+    return !!obj && typeof obj.then === 'function';
+}
+
+export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+export function getItem(item: any) {
+    if (!item)
+        throw "item cannot be undefined or null";
+    if (typeof item === "function")
+        return getItem(item());
+    return item;
+}
+
+
+export function refCondition<T>(fn: () => T) {
+    const ref = reactRef(undefined);
+    if (ref.current == undefined)
+        ref.current = fn();
+
+    return { value: ref.current as T, setValue: (value: T) => ref.current = value };
+}
+
+
+export const toObject = (...keys: string[]) => {
+    if (keys.length === 0) return { AllKeys: true } as Record<string, boolean>;
+
+    return keys.reduce((c, v) => {
+        c[v] = true;
+        return c;
+    }, {} as Record<string, boolean>);
+};
+
+export function getPrototypeChain(obj) {
+    let prototypeChain = [];
+    (function innerRecursiveFunction(obj) {
+        let currentPrototype = obj != null ? Object.getPrototypeOf(obj) : null;
+        prototypeChain.push(currentPrototype);
+        if (currentPrototype != null) {
+            innerRecursiveFunction(currentPrototype);
+        }
+    })(obj);
+    return prototypeChain.filter(x => x !== null);
+}
+
+export const keys = (item: any, prototype: any) => {
+    let prototypes = getPrototypeChain(item);
+
+    let ks = [
+        ...Object.keys(item),
+        ...prototypes.flatMap(x => Object.getOwnPropertyNames(x))
+    ];
+    let obp = Object.getOwnPropertyNames(Object.prototype);
+
+    let cbp = Object.getOwnPropertyNames(prototype);
+
+    ks = ks
+        .filter(x => !obp.includes(x) && !cbp.includes(x))
+        .filter((value, index, array) => array.indexOf(value) === index);
+    // alert(JSON.stringify(ks, undefined, 4));
+    return ks;
+};
+
+export const getValueByPath = (value: any, path: string) => {
+    if (!path) return value;
+    const segments = path.split(".");
+
+    let current = value;
+    for (const key of segments) {
+        if (current == null || current == undefined) return undefined; // handles null and undefined
+        current = current[key];
+    }
+
+    return current;
+};
+
+export const valid = (item: any, validArray?: boolean) => {
+    if (item == undefined || item === null) return false;
+    if (item instanceof Set) return false;
+    if (item instanceof Map) return false;
+    if (typeof item === "function") return false;
+    if (typeof item === "string") return false;
+    if (validArray && Array.isArray(item) && item.length > 0) {
+        return valid(item[0]) as boolean;
+    }
+    return typeof item === "object";
+};

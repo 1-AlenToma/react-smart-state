@@ -1,507 +1,15 @@
-import { useRef, useState, useEffect } from "react";
-
-
-const reactEffect = useEffect as any;
-const reactRef = useRef as any;
-const reactState = useState as any;
-function updater() {
-    const [value, setValue] = reactState(0);
-
-    return ({
-        value,
-        refresh: () => {
-            setValue(prev => (prev < 1000 ? prev + 1 : 1));
-        }
-    });
-}
-
-function isPromise(obj: any): obj is Promise<any> {
-    return !!obj && typeof obj.then === 'function';
-}
-
-
-const hidenProps = (instince: any, key: string, value?: any) => {
-    // Define _events as a non-enumerable property
-    if (value == undefined && key in instince)
-        value = instince[key];
-    Object.defineProperty(instince, key, {
-        value: value,
-        enumerable: false, // This hides it from Object.keys()
-        configurable: true,
-        writable: true
-    });
-}
-
-function toType<T>(item: any) {
-    return item as T
-}
-
-function getItem(item: any) {
-    if (!item)
-        throw "item cannot be undefined or null";
-    if (typeof item === "function")
-        return getItem(item());
-    return item;
-}
-
-
-function refCondition<T>(fn: () => T) {
-    const ref = reactRef(undefined);
-    if (ref.current == undefined)
-        ref.current = fn();
-
-    return { value: ref.current as T, setValue: (value: T) => ref.current = value };
-}
-
-let ids = new Map();
-let lastDate = new Date();
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-export const newId = (inc?: string): string => {
-    if ((Date.now() - lastDate.getTime()) > 60 * 1000) {
-        ids = new Map();
-        lastDate = new Date();
-    }
-    let id = (inc ?? "") + Date.now().toString(36) + Math.floor(1e12 + Math.random() * 9e12).toString(36);
-
-    if (ids.has(id)) {
-        // Retry without prefix to avoid exponential growth
-        return newId();
-    }
-    ids.set(id, id);
-    return id;
-}
-
-
-
-const toObject = (...keys: string[]) => {
-    if (keys.length === 0) return { AllKeys: true } as Record<string, boolean>;
-
-    return keys.reduce((c, v) => {
-        c[v] = true;
-        return c;
-    }, {} as Record<string, boolean>);
-};
-
-export function getPrototypeChain(obj) {
-    let prototypeChain = [];
-    (function innerRecursiveFunction(obj) {
-        let currentPrototype = obj != null ? Object.getPrototypeOf(obj) : null;
-        prototypeChain.push(currentPrototype);
-        if (currentPrototype != null) {
-            innerRecursiveFunction(currentPrototype);
-        }
-    })(obj);
-    return prototypeChain.filter(x => x !== null);
-}
-
-const keys = (item: any) => {
-    let prototypes = getPrototypeChain(item);
-
-    let ks = [
-        ...Object.keys(item),
-        ...prototypes.flatMap(x => Object.getOwnPropertyNames(x))
-    ];
-    let obp = Object.getOwnPropertyNames(Object.prototype);
-
-    let cbp = Object.getOwnPropertyNames(Create.prototype);
-
-    ks = ks
-        .filter(x => !obp.includes(x) && !cbp.includes(x))
-        .filter((value, index, array) => array.indexOf(value) === index);
-    // alert(JSON.stringify(ks, undefined, 4));
-    return ks;
-};
-
-const getValueByPath = (value: any, path: string) => {
-    if (!path) return value;
-    const segments = path.split(".");
-
-    let current = value;
-    for (const key of segments) {
-        if (current == null || current == undefined) return undefined; // handles null and undefined
-        current = current[key];
-    }
-
-    return current;
-};
-
-export const valid = (item: any, validArray?: boolean) => {
-    if (item == undefined || item === null) return false;
-    if (item instanceof Set) return false;
-    if (item instanceof Map) return false;
-    if (typeof item === "function") return false;
-    if (typeof item === "string") return false;
-    if (validArray && Array.isArray(item) && item.length > 0) {
-        return valid(item[0]) as boolean;
-    }
-    return typeof item === "object";
-};
-
-export type NestedKeyOf<
-    T extends object,
-    D extends any[] = [0, 0, 0, 0, 0]
-> = D extends [any, ...infer DD]
-    ? {
-        [K in keyof T & (string | number)]: T[K] extends object
-        ? `${K}` | `${K}.${NestedKeyOf<T[K], DD>}`
-        : `${K}`;
-    }[keyof T & (string | number)]
-    : never;
-
-export type WaitngItem = { key: string, oldValue: any, newValue: any };
-
-export type EventItem = {
-    keys: Record<string, boolean>;
-    func: (item: Record<string, WaitngItem>) => void,
-    item?: any;
-};
-
-export class FastList<T, Key extends string | number | symbol = string> {
-    private item: Record<Key, T> = {} as Record<Key, T>;
-    _length = 0;
-    _keys?: string[];
-    _values?: T[];
-
-    private clearKeys() {
-        this._keys = undefined;
-        this._values = undefined;
-        return this;
-    }
-
-    clear(): this {
-        this.item = {} as any;
-        this._length = 0;
-        return this.clearKeys();
-    }
-
-
-    get hasValue() {
-        return this._length > 0;
-    }
-
-    get values() {
-        return this._values ?? (this._values = Object.values(this.item));
-    }
-
-    get keys() {
-        return this._keys ?? (this._keys = Object.keys(this.item));
-    }
-
-    find(func: (item: T, key: Key) => boolean): T | undefined {
-        for (let k in this.item) {
-            let item = this.item[k];
-            if (func(item, k))
-                return item;
-        }
-
-        return undefined;
-    }
-
-    findKey(func: (item: T, key: Key) => boolean): Key | undefined {
-        for (let k in this.item) {
-            let item = this.item[k];
-            if (func(item, k as Key))
-                return k as Key;
-        }
-
-        return undefined;
-    }
-
-
-    delete(key: Key) {
-        if (key in this.item) {
-            this.clearKeys()._length--;
-            delete this.item[key];
-        }
-        return this;
-    }
-
-    get(key: Key): T | undefined {
-        return this.item[key];
-    }
-
-    records() {
-        return this.item as Record<Key, T>;
-    }
-
-    record(key: Key): Record<string, T> {
-        let item: Record<Key, T> = {} as any;
-        item[key] = this.get(key);
-        return item;
-    }
-
-    has(key: Key) {
-        return key in this.item;
-    }
-
-    append(key: Key, item: T) {
-        let it = this.get(key);
-        if (it)
-            Object.assign(it, item);
-        else this.set(key, item);
-        return this;
-    }
-
-    set(key: Key, item: T): T {
-        if (item == undefined) {
-            this.delete(key);
-            return item;
-        }
-
-        if (!this.has(key)) {
-            this.clearKeys()._length++;
-        }
-        this.item[key] = item;
-
-        return item;
-    }
-}
-
-type StateType = "Local" | "Global";
-type LocalEvent = {
-    bending?: boolean;
-    bendingValue?: undefined;
-    func: Function;
-    redefineItem?: boolean;
-}
-
-export class EventTrigger {
-    _events: Record<string, EventItem> = {};
-    _timer: any = undefined;
-    _waitingEvents: FastList<{ event: EventItem, items: FastList<WaitngItem> }> = new FastList();
-    _addedPaths: FastList<string> = new FastList();
-    _localBindedEvents: FastList<FastList<LocalEvent>> = new FastList();
-    speed?: number = 2;
-    _stateType: StateType;
-    _batching: FastList<Function, number> = new FastList<Function, number>();
-
-    _add(id: string, item: EventItem) {
-        this._events[id] = item;
-    }
-
-    _remove(id: string) {
-        delete this._events[id];
-    }
-
-    _hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>, mappedKeys: Record<string, boolean>) {
-        let hasChanges = false;
-        let newState = parentState ?? {};
-        for (const { key, oldValue, newValue } of Object.values(items)) {
-            if (oldValue !== newValue) {
-                hasChanges = true;
-            }
-            newState[key] = newValue;
-        }
-
-        return { hasChanges, parentState: newState };
-
-    }
-
-    triggerLocalBindingChanges() {
-        // execute all bending items
-        this._localBindedEvents.values.flatMap(x => x.values.filter(f => f.bending == true)).forEach(x => {
-            x.bending = false;
-            x.func(x.bendingValue);
-            x.bendingValue = undefined;
-        });
-    }
-
-    async triggerSavedChanges() {
-        clearTimeout(this._timer); // Proper debouncing
-        if (this._batching._length > 0)
-            return;
-
-        const runHandlers = (e: EventItem, items: Record<string, WaitngItem>) => {
-            e.func?.(items);
-        };
-
-        const trigger = (fn: () => void) => {
-            if (this.speed == undefined) {
-                fn();
-            }
-            else {
-                this._timer = setTimeout(fn, this.speed);
-            }
-        }
-        trigger(() => {
-            let itemKeys = this._waitingEvents.values;
-            this._waitingEvents.clear();
-            for (let item of itemKeys) {
-                runHandlers(item.event, item.items.records());
-            }
-
-            this.triggerLocalBindingChanges();
-        });
-    }
-
-    async _trigger(event: { eventId: string, event: EventItem }, key: string, oldValue: any, newValue: any) {
-        clearTimeout(this._timer); // Proper debouncing
-        const { eventId, event: evt } = event;
-
-        const waitingItems = (this._waitingEvents.has(eventId) ? this._waitingEvents.get(eventId) : this._waitingEvents.set(eventId, {
-            event: evt,
-            items: new FastList()
-        })).items;
-
-        waitingItems.set(key, { key, oldValue, newValue });
-        if (this._batching._length > 0)
-            return;
-        await this.triggerSavedChanges();
-
-    }
-
-    async _onChange(key: string, { oldValue, newValue }) {
-        try {
-            clearTimeout(this._timer); // Proper debouncing
-            // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
-            let called = false;
-            const parts = key.split(".");
-            for (const [eventId, event] of Object.entries(this._events)) {
-                if (event.keys.AllKeys || event.keys[key]) {
-                    this._trigger({ eventId, event }, key, oldValue, newValue);
-                    called = true;
-                    continue;
-                }
-
-                // Traverse up the key chain: "a.b.c" → "a.b" → "a"
-                for (let i = parts.length - 1; i > 0; i--) {
-                    const parentKey = parts.slice(0, i).join(".");
-                    if (event.keys[parentKey]) {
-                        this._trigger({ eventId, event }, key, oldValue, newValue);
-                        called = true;
-                        break; // stop at the first match for performance
-                    }
-                }
-            }
-
-            if (!called && this._batching._length <= 0)
-                this.triggerLocalBindingChanges();
-        } catch (e) {
-            console.error(e);
-        }
-    }
-}
-
-
-
-type IPrivateCreate = {
-    getInstanceType(): string;
-    getEvent(): EventTrigger;
-}
-
-
-
-
-
-/**
- * ReturnState defines the extended API returned from Create or StateBuilder,
- * providing reactive bindings, event hooks, and integration with React-like effects.
- */
-export type ReturnState<T extends object> = {
-    /**
-     * Runs a function in a batched update context.
-     * - Queues the function to be executed.
-     * - If it returns a Promise, `updates` is deferred until it resolves.
-     * - Prevents intermediate state propagation during batch execution.
-     *
-     * @param func - A function that performs updates, possibly asynchronous.
-     * @returns A Promise that resolves when the batch is complete.
-     */
-    batch(func: () => void | Promise<void>): Promise<void>;
-
-
-    /**
-  * Creates a computed value based on the current state.
-  * - Automatically re-computes when any of the specified keys change.
-  * - Caches and reuses the result until dependencies update.
-  *
-  * @typeParam B - The return type of the computed value.
-  * @param fn - A function that receives the current state and optionally the previous computed value.
-  * @param keys - List of nested keys to watch for triggering re-computation.
-  * @returns The result of the computed function.
-  */
-    useComputed<B>(fn: (item: T, currentValue?: T) => B, ...keys: NestedKeyOf<T>[]): B;
-
-    /**
-     * Registers reactive listeners for the specified keys.
-     * Returns a chainable `.on()` to subscribe to changes.
-     * 
-     * @param keys - Keys to track for changes.
-     * @returns An object with an `.on()` method to register a listener.
-     */
-    hook(...keys: NestedKeyOf<T>[]): {
-        /**
-         * Subscribes to change events when any of the specified keys change.
-         * 
-         * @param fn - A function that receives the item and returns a boolean.
-         * @returns The current reactive state object (chainable).
-         */
-        on: (fn: (item: T) => boolean) => ReturnState<T>;
-    };
-
-    /**
-     * Registers a side effect that re-runs when specified keys change.
-     * Works similarly to React's useEffect but for reactive state.
-     * 
-     * @param fn - The effect function to run on change.
-     * @param keys - Keys to track for re-running the effect.
-     */
-    useEffect(fn: Function, ...keys: NestedKeyOf<T>[]): void;
-
-    /**
-     * Binds an event listener to a specific path.
-     * The path can be deeply nested (e.g., "user.profile.name").
-     * 
-     * @param path - The full property path to bind.
-     * @param autoUnbind will use react.useffect to unbind the key
-     */
-    bind(path: string, autoUnbind?: boolean): ReturnState<T>;
-
-    /**
-     * Removes a previously bound event listener on the given path.
-     * 
-     * @param path - The full property path to unbind.
-     */
-    unbind(path: string): ReturnState<T>;
-
-    /**
-     * Binds a local (component-scoped) event listener to a path.
-     * Returns a chainable `.on()` to subscribe to it.
-     * 
-     * @param path - The full property path to bind.
-     * @returns An object with `.on()` method for subscribing.
-     */
-    localBind(path: string): {
-        /**
-         * Subscribes to the locally scoped event.
-         * 
-         * @param fn - A function that receives the item and returns a boolean.
-         * @returns The current reactive state object (chainable).
-         */
-        on: (fn: (item: T) => boolean) => ReturnState<T>;
-    };
-};
-
-export type LocalStateManagment<T extends object> = {
-    /** reset the state to its original initiated value */
-    resetState(): void;
-}
-
-
-type CreateItem<T extends object> = {
-    item: T,
-    parent?: any,
-    parentItem?: ReturnState<T> & IPrivateCreate,
-    ignoreKeys: Record<string, boolean>,
-    seen?: WeakMap<any, any>
-}
+import { getItem, getValueByPath, keys, newId, reactEffect, reactRef, reactState, refCondition, toObject, updater, valid } from "./methods";
+import { EventTrigger, FastList } from "./objects";
+import { CreateItem, IEventTrigger, IPrivateCreate, LocalStateManagment, NestedKeyOf, ReturnState } from "./types";
+export * from "./methods";
+export * from "./types";
+export * from "./objects";
 
 class Create<T extends object> {
-    #_events?: EventTrigger;
+    #events?: IEventTrigger;
     async batch(func: (() => void | Promise<void>)) {
-        const batching = this.getEvent()._batching;
-        const index = batching._length;
+        const batching = this.getEvent().batching;
+        const index = batching.size;
         const enable = () => {
             batching.delete(index);
             this.getEvent().triggerSavedChanges();
@@ -521,9 +29,9 @@ class Create<T extends object> {
         let mappedKeys = refCondition(() => toObject(...keys)).value
         let [state, setState] = reactState({});
         let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
-        this.#_events._add(id, {
+        this.getEvent().add(id, {
             func: items => {
-                let newState = this.#_events._hasChange(items, state, mappedKeys);
+                let newState = this.getEvent().hasChange(items, state);
                 const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
                 if (update)
                     setState({ ...newState.parentState });
@@ -532,7 +40,7 @@ class Create<T extends object> {
         });
 
         reactEffect(() => {
-            return () => this.#_events._remove(id);
+            return () => this.getEvent().remove(id);
         }, [])
 
         return {
@@ -548,7 +56,7 @@ class Create<T extends object> {
         let mappedKeys = refCondition(() => toObject(...keys)).value
         let [state, setState] = reactState(fn(this as any, undefined));
 
-        this.#_events._add(id, {
+        this.getEvent().add(id, {
             func: () => {
                 let newValue = fn(this as any, state);
                 if (newValue !== state)
@@ -557,6 +65,10 @@ class Create<T extends object> {
             keys: mappedKeys
         });
 
+        reactEffect(() => {
+            return () => this.getEvent().remove(id);
+        }, [])
+
         return state as B;
     }
 
@@ -564,9 +76,9 @@ class Create<T extends object> {
         let id = refCondition<string>(newId).value;
         let mappedKeys = refCondition(() => toObject(...keys)).value
         let state = reactRef({});
-        this.#_events._add(id, {
+        this.getEvent().add(id, {
             func: (items) => {
-                let newState = this.#_events._hasChange(items, state.current, mappedKeys);
+                let newState = this.getEvent().hasChange(items, state.current);
                 if (newState.hasChanges)
                     fn(this)
                 state.current = newState.parentState;
@@ -575,15 +87,13 @@ class Create<T extends object> {
         });
 
         reactEffect(() => {
-            return () => this.#_events._remove(id);
+            return () => this.getEvent().remove(id);
         }, [])
     }
 
-    unbind(path: string, islocal?: boolean, redefineItem?: boolean) {
+    unbind(path: string) {
         try {
-            if (!this.#_events._addedPaths.has(path) && !islocal) return; // not bound, do nothing
-            if (!redefineItem)
-                this.#_events._addedPaths.delete(path);
+            if (!this.getEvent().addedPaths.has(path)) return; // not bound, do nothing
             let item = this;
             let key = path.split(".").reverse()[0];
             for (let p of path.split(".")) {
@@ -606,59 +116,33 @@ class Create<T extends object> {
     }
 
     localBind(path: string) {
-        const [_, setValue] = reactState();
+        const [state, setState] = reactState();
         const id = refCondition(newId).value;
         const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
-        const cValue = refCondition(() => getValueByPath(this, path))
-        if (!this.#_events._localBindedEvents.has(path) || this.#_events._localBindedEvents.get(path)?.get(id)?.redefineItem) {
-            if (this.#_events._localBindedEvents.has(path))
-                this.unbind(path, true, true);
-            if (!this.#_events._localBindedEvents.has(path))
-                this.#_events._localBindedEvents.set(path, new FastList<LocalEvent>);
-            let item = this;
-            let key = path.split(".").reverse()[0];
-            for (let p of path.split(".")) {
-                if (item[p] !== null && typeof item[p] === "object") {
-                    item = item[p];
-                } else break;
-            }
-
-            if (item) {
-                Object.defineProperty(item, key, {
-                    enumerable: true,
-                    configurable: true,
-                    get: () => cValue.value,
-                    set: (value: any) => {
-                        if (value !== cValue.value) {
-                            cValue.setValue(value);
-                            if ((!hookSettings.on || hookSettings.on(this)) && this.#_events._localBindedEvents.get(path)) {
-                                if (this.#_events._batching) {
-                                    this.#_events._localBindedEvents.get(path).get(id).bending = true;
-                                    this.#_events._localBindedEvents.get(path).get(id).bendingValue = value;
-                                }
-                                else
-                                    this.#_events._localBindedEvents.get(path)?.values.forEach(x => x.func(value));
-                            }
-
-                        }
-                    }
-                });
-            }
+        const cValue = refCondition(() => getValueByPath(this, path));
+        const mappedKeys = refCondition(() => toObject(path)).value;
+        if (!this.getEvent().localBindedEvents.has(path)) {
+            this.getEvent().localBindedEvents.set(path, new FastList<boolean>());
+            this.bind(path);
         }
-
-        this.#_events._localBindedEvents.get(path)?.append(id, {
-            func: (value: any) => {
-                setValue(value);
+        this.getEvent().localBindedEvents.get(path).set(id, true);
+        this.getEvent().add(id, {
+            func: (items) => {
+                let newState = this.getEvent().hasChange(items, state);
+                const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
+                if (update)
+                    setState({ ...newState.parentState });
             },
-            redefineItem: false
+            keys: mappedKeys
         });
 
         reactEffect(() => {
             return () => {
-                this.#_events._localBindedEvents.get(path)?.delete(id);
-                if (!(this.#_events._localBindedEvents.get(path)?.hasValue)) {
-                    this.#_events._localBindedEvents.delete(path);
-                    this.unbind(path, true);
+                this.getEvent().remove(id);
+                this.getEvent().localBindedEvents.get(path)?.delete(id)
+                if (!this.getEvent().localBindedEvents.get(path)?.hasValue) {
+                    this.getEvent().localBindedEvents.delete(path);
+                    this.unbind(path);
                 }
             }
         }, []);
@@ -673,8 +157,8 @@ class Create<T extends object> {
 
 
     bind(path: string, autoUnbind?: boolean) {
-        if (!this.#_events._addedPaths.has(path)) {
-            this.#_events._addedPaths.set(path, path);
+        if (!this.getEvent().addedPaths.has(path)) {
+            this.getEvent().addedPaths.set(path, path);
             let item = this;
             let key = path.split(".").reverse()[0];
             for (let p of path.split(".")) {
@@ -693,7 +177,7 @@ class Create<T extends object> {
                         let newValue = { oldValue: v, newValue: value };
                         if (value !== v) {
                             v = value;
-                            this.#_events._onChange(path, newValue);
+                            this.getEvent().onChange(path, newValue);
                         }
                     }
                 });
@@ -715,7 +199,7 @@ class Create<T extends object> {
     }
 
     getEvent() {
-        return this.#_events;
+        return this.#events;
     }
 
     getInstanceType() {
@@ -728,7 +212,7 @@ class Create<T extends object> {
             data.seen = new WeakMap();
         if (data.parentItem === undefined) {
             data.parentItem = this;
-            this.#_events = new EventTrigger();
+            this.#events = new EventTrigger();
         }
 
         let { item, parent, parentItem, ignoreKeys, seen } = data
@@ -770,7 +254,7 @@ class Create<T extends object> {
         };
 
         try {
-            for (let k of keys(item)) {
+            for (let k of keys(item, Create.prototype)) {
                 let parentKey = parentKeys(k);
                 let v = parse(item[k], parentKey);
                 seen.delete(item[k]);
@@ -786,33 +270,21 @@ class Create<T extends object> {
                         if ((parentKey.includes(".") || k === parentKey) && valid(value)) {
                             let parts = parentKey.split(".");
                             // Traverse up from most specific to least specific (excluding the root level)
-                            if (parentItem.getEvent()._addedPaths.hasValue || parentItem.getEvent()._localBindedEvents.hasValue)
+                            if (parentItem.getEvent().addedPaths.hasValue || parentItem.getEvent().localBindedEvents.hasValue)
                                 while (parts.length > 1 || (parts.length > 0 && k == parentKey)) {
                                     parts = parts.slice(0, -1);
                                     const pKey = k == parentKey ? k : parts.join(".");
 
-                                    if (parentItem.getEvent()._addedPaths.hasValue)
-                                        parentItem.getEvent()._addedPaths.keys.forEach(addedKey => {
+                                    if (parentItem.getEvent().addedPaths.hasValue)
+                                        parentItem.getEvent().addedPaths.keys.forEach(addedKey => {
                                             if (addedKey.startsWith(pKey + ".") || addedKey === pKey) {
                                                 parentItem.unbind(addedKey);
                                                 parentItem.bind(addedKey);
                                             }
                                         });
-
-                                    if (parentItem.getEvent()._localBindedEvents.hasValue)
-                                        parentItem.getEvent()._localBindedEvents.keys.forEach((addedKey) => {
-                                            if (addedKey.startsWith(pKey + ".") || addedKey === pKey) {
-                                                if (parentItem.getEvent()._localBindedEvents.get(addedKey)?.hasValue)
-                                                    for (let item of parentItem.getEvent()._localBindedEvents.get(addedKey).values) {
-                                                        item.bending = true;
-                                                        item.bendingValue = getValueByPath(this, addedKey);
-                                                        item.redefineItem = true;
-                                                    }
-                                            }
-                                        });
                                 }
                         }
-                        parentItem.getEvent()._onChange(parentKey, newValue);
+                        parentItem.getEvent().onChange(parentKey, newValue);
                     }
                 });
             }
@@ -834,7 +306,7 @@ class StateBuilder<T extends object> {
     private bindKeys: string[] = [];
     private localBindKeys: string[] = [];
     private timeoutSpeed?: number = -1;
-    private _onInit?: (item: T) => Promise<void>;
+    private onStateInit?: (item: T) => Promise<void>;
 
     /**
      * @param item - The object to wrap in a reactive state, or a function returning it
@@ -853,10 +325,21 @@ class StateBuilder<T extends object> {
         return this;
     }
 
+    /**
+     * Registers an asynchronous initialization function that will be called 
+     * when the state is first created or initialized.
+     *
+     * Useful for performing setup logic such as loading data, setting defaults, or
+     * triggering side effects after the state is ready.
+     *
+     * @param func - An async function that receives the initial state and performs setup.
+     * @returns The current instance (for chaining).
+     */
     onInit(func: (state: T) => Promise<void>) {
-        this._onInit = func;
+        this.onStateInit = func;
         return this;
     }
+
 
     /**
      * Ignores specified nested keys from being proxied/reactive.
@@ -909,13 +392,13 @@ class StateBuilder<T extends object> {
                 ? undefined
                 : $this.timeoutSpeed;
 
-            $this.initilized.getEvent()._stateType = "Local";
+            $this.initilized.getEvent().stateType = "Local";
 
         }
 
         reactEffect(() => {
-            if ($this._onInit)
-                $this._onInit($this.initilized as any as T);
+            if ($this.onStateInit)
+                $this.onStateInit($this.initilized as any as T);
         }, [update.value])
 
         $this.initilized.resetState = () => {
@@ -954,9 +437,9 @@ class StateBuilder<T extends object> {
             this.initilized.getEvent().speed = this.timeoutSpeed === -1
                 ? 2
                 : this.timeoutSpeed;
-            this.initilized.getEvent()._stateType = "Global";
-            if (this._onInit)
-                this._onInit(this.initilized as any as T);
+            this.initilized.getEvent().stateType = "Global";
+            if (this.onStateInit)
+                this.onStateInit(this.initilized as any as T);
         }
 
         return this.initilized as any as ReturnState<T> & T;

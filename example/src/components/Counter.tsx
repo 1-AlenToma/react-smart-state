@@ -107,7 +107,7 @@ const TestSmartState = () => {
   globalState.useEffect(() => {
     console.log("Global counter changed:", globalState.counter);
   }, "counter");
-
+  console.log(state.item.a)
   return (
     <div style={{ fontFamily: "monospace" }}>
       <h3>Local State</h3>
@@ -119,33 +119,39 @@ const TestSmartState = () => {
 
       <button
         onClick={() => {
+          state.batch(async () => {
+            state.item.a += 50;
 
-          // Update local state
+          });
+          state.batch(async () => {
+            for (let i = 0; i < 100; i++) {
+              state.item.a++;
+            }
+            // Update local state
+            state.item = state.item;
+            state.item.a++;
 
-          state.item = state.item;
-          state.item.a++;
-          return;
-          state.itemA++;
-          state.test.counter++;
-          // Reset logic
-          if (state.test.counter === 5) {
-            state.test = new StateItem(); // Replace ignored object
-          }
+            state.itemA++;
+            state.test.counter++;
+            // Reset logic
+            if (state.test.counter === 5) {
+              state.test = new StateItem(); // Replace ignored object
+            }
 
-          // Update global state
-          /**   globalState.counter++;
+            // Update global state
+            globalState.counter++;
             globalState.item.counter++;
-            globalState.shared += 2;*/
+            globalState.shared += 2;
 
-          // Test rerender-triggering same reference
+            // Test rerender-triggering same reference
 
 
-          // Reset state when a threshold is hit
-          if (state.itemA >= 8) {
-            state.resetState();
-          }
-          // await sleep(1000)
-
+            // Reset state when a threshold is hit
+            if (state.itemA >= 8) {
+              state.resetState();
+            }
+            //  await sleep(1000)
+          });
         }}
       >
         increase

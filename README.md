@@ -1,110 +1,145 @@
-# react-smart-state
+# 🧠 react-smart-state
 
-> Next generation local and global state management
+> Next-generation local and global state management for React
 
-`react-smart-state` makes your state management much simple to handle.
+**react-smart-state** simplifies React state handling with a minimal, powerful API for both local and global state.
 
-I have looked at state management libraries like redux, atom etc and each of them takes to much code/work to create and manage, this is why I built this library.
+Unlike Redux, Zustand, Recoil, or Jotai, this library removes boilerplate, offers smarter proxying, and supports hot reloading — no need to refresh after each change in development mode.
 
-This library also able to handle working in devoloped mode. no need to reload the application each time you change your code.
+[![NPM](https://img.shields.io/npm/v/react-smart-state.svg)](https://www.npmjs.com/package/react-smart-state)
+[![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
-[![NPM](https://img.shields.io/npm/v/react-smart-state.svg)](https://www.npmjs.com/package/react-smart-state) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
+---
 
-## Install
+## 📦 Installation
 
 ```bash
 npm install react-smart-state
 ```
 
-## Usage 
+---
 
-# Local State
+## 🧱 `buildState()` API
+
+Use `buildState()` to create and configure a local or global state instance.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `ignore(...keys)` | Ignores deeply nested objects to prevent performance overhead (e.g., recursive or large structures). |
+| `bind(...paths)` | Globally binds a property inside an ignored object to allow reactivity. |
+| `localBind(...path)` | Same as `bind`, but only applies to the local component. |
+| `onInit(fn: (state) => Promise<void>)` | Called once asynchronously when the state is initialized. |
+| `timeout(ms: number | undefined)` | Sets a delay (in ms) for batching updates. Use `undefined` to disable. Default is `2ms` for global. |
+| `build()` | Builds a **local** (component-scoped) state. |
+| `globalBuild()` | Builds a **global** shared state instance. |
+
+---
+
+## 🔁 State Instance Methods
+
+After building a state, you can use these instance methods:
+
+### Methods & Properties
+
+| Method / Prop | Description |
+|---------------|-------------|
+| `bind(path)` | Globally binds ignored sub-properties to track changes. |
+| `unbind(path)` | Unbinds a previously bound property. |
+| `batch(fn: () => void | Promise<void>)` | Batches state changes and defers triggers. Handles async too. |
+| `localBind(path)` | Binds sub-properties only within the current component that is ignored. |
+| `hook(path)` | Hooks into property changes reactively. |
+| `hook().on(conditionFn)` | Conditionally triggers updates based on a function. Example: `hook("count").on(x => x.count > 5)` |
+| `useEffect(fn, ...keys)` | Runs a callback when a specific state key changes. |
+| `useComputed(fn, ...keys)` | Returns a reactive computed value based on keys. |
+| `resetState()` | Resets the local state to its original values. if onInit is set, it will also trigger it |
+
+---
+
+## 🧪 Example
 
 ```tsx
-import buildState from 'react-smart-state';
+import buildState from "react-smart-state";
+
+const globalState = buildState({
+  counter: 0,
+  item: { count: 1 }
+}).timeout(undefined).globalBuild();
 
 const Counter = () => {
   const state = buildState({
-        itemA: 0,
-        item: { a: 0 },
-        test: new StateItem()
-}).ignore("item").bind("item.a").build();
-      
-  state.useEffect(() => {
-    
-   // console.error(state);
-  }, "itemA", "item.a")
-  //alert(state.item.a)
-  return (
-    <div>
-      <label>{state.itemA} && {state.item.a} && {state.test.name} </label>
-      <button onClick={() => {
-        state.itemA++;
-        state.item.a++;
-      }}>increase</button>
-    </div>
-  )
-}
-```
-
-# GlobalState
-
-```tsx
-import buildState from 'react-smart-state';
-
-const state = buildState({
-        itemA: 0,
-        item: { a: 0 },
-        test: new StateItem()
-}).ignore("item").globalBuild();
-const Counter = () => {
-  // for all items change except ignored items
-  state.hook();
-  // or specify items
-  state.hook("itemA");
-
-  // if you want to bind an item in ignore item then 
-  state.bind("item.a") // then add its hook state.hook("item.a")
-  // or 
-  state.localBind("item.a") // this will only bind it in the current component
+    localCount: 0,
+    nested: { value: 0 }
+  })
+    .ignore("nested")
+    .localBind("nested.value", "localCount")
+    .build();
 
   state.useEffect(() => {
-   // console.error(state);
-  }, "itemA", "item.a")
-  //alert(state.item.a)
+    console.log("localCount changed:", state.localCount);
+  }, "localCount");
+
   return (
     <div>
-      <label>{state.itemA} && {state.item.a} && {state.test.name} </label>
+      <p>Global Counter: {globalState.counter}</p>
+      <p>Local Count: {state.localCount}</p>
       <button onClick={() => {
-        state.itemA++;
-        state.item.a++;
-      }}>increase</button>
+        globalState.counter++;
+        state.localCount++;
+        state.nested.value++;
+      }}>
+        Increment
+      </button>
     </div>
-  )
-}
+  );
+};
 ```
 
-## BuildState Methods 
-| Name | Descriptions |
-| ------------- | ------------- |
-| ignore | Ignore props from proxy this is usefull when you have a big or recrusive items, those could be ignored as it may slow down the application, you will still get notified when setting it but it will ignore its probs. |
-| bind | bind prop in ignored object, this work globlly|
-| unbind | unbind binded prop |
-| localBind | bind prop in ignored object, this only work locally eg for the component that is exist in |
-| build | build the local state |
-| globalBuild | build the global state |
-| timeout | disable settimeout by giving undefined value or specify a number in ms default is 2 ms for globalBuild and undefiend for build |
+---
 
-## State additional props
-| Name | Descriptions |
-| ------------- | ------------- |
-| bind | bind prop in ignored object, this work globlly|
-| unbind | unbind binded prop |
-| localBind | bind prop in ignored object, this only work locally eg for the component that is exist in |
-| hook | used to hook changes to a specific component |
-| hook().on | trigger update with condition eg hook("counter").on(x=> x.counter >3) |
-| useEffect | get notify of a change |
+## ⚙️ Advanced Usage
 
-## License
+### `onInit`
 
-MIT
+```ts
+const state = buildState({ user: null })
+  .onInit(async (state) => {
+    state.user = await fetchUser();
+  })
+  .build();
+```
+
+### `batch`
+
+```ts
+await state.batch(async () => {
+  state.a = 1;
+  state.b = 2;
+  await someAsyncCall();
+  state.c = 3;
+});
+```
+
+### `hook().on`
+
+```ts
+state.hook("value").on(v => v.value > 10);
+```
+
+---
+
+## 💡 Why Use react-smart-state?
+
+- ✅ No boilerplate
+- 🔁 Works with both local and global state
+- ⚡ Fast with efficient deep reactivity
+- 🧠 Easy to use computed values and bindings
+- ♻️ Full hot reload support
+- 📦 Minimal package footprint
+
+---
+
+## 📄 License
+
+MIT © [Alen Toma]
