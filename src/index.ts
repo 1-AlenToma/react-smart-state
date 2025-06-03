@@ -1,6 +1,6 @@
-import { clone, getItem, getValueByPath, isArray, isSame, keys, newId, reactEffect, reactRef, reactState, refCondition, toObject, updater, valid } from "./methods";
+import { clone, getItem, getValueByPath, isArray, isSame, keys, newId, reactEffect, reactRef, reactState, refCondition, SmartStateError, toObject, updater, valid } from "./methods";
 import { EventTrigger, FastList, ObservableArray } from "./objects";
-import { CreateItem, IEventTrigger, IPrivateCreate, LocalStateManagment, NestedKeyOf, ReturnState, SmartStateInstanceNames } from "./types";
+import { CreateItem, IEventTrigger, LocalStateManagment, NestedKeyOf, ReturnState, SmartStateInstanceNames } from "./types";
 export * from "./methods";
 export * from "./types";
 export * from "./objects";
@@ -18,77 +18,89 @@ class Create<T extends object> {
         try {
             await func();
         } catch (e) {
-            console.error(e);
+            SmartStateError(e, { code: "batch", details: func });
         } finally {
             enable();
         }
     }
 
     hook(...keys: NestedKeyOf<T>[]) {
-        let id = refCondition<string>(newId).value;
-        let mappedKeys = refCondition(() => toObject(...keys)).value
-        let [state, setState] = reactState({});
-        let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
-        this.getEvent().add(id, {
-            func: items => {
-                let newState = this.getEvent().hasChange(items, state);
-                const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
-                if (update)
-                    setState({ ...newState.parentState });
-            },
-            keys: mappedKeys
-        });
+        try {
+            let id = refCondition<string>(newId).value;
+            let mappedKeys = refCondition(() => toObject(...keys)).value
+            let [state, setState] = reactState({});
+            let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
+            this.getEvent().add(id, {
+                func: items => {
+                    let newState = this.getEvent().hasChange(items, state);
+                    const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
+                    if (update)
+                        setState({ ...newState.parentState });
+                },
+                keys: mappedKeys
+            });
 
-        reactEffect(() => {
-            return () => this.getEvent().remove(id);
-        }, [])
+            reactEffect(() => {
+                return () => this.getEvent().remove(id);
+            }, [])
 
-        return {
-            on: (fn: (item) => boolean) => {
-                hookSettings.on = fn;
-                return this as any;
+            return {
+                on: (fn: (item) => boolean) => {
+                    hookSettings.on = fn;
+                    return this as any;
+                }
             }
+        } catch (e) {
+            throw SmartStateError(e, { code: "hook", details: keys });
         }
     }
 
     useComputed<B>(fn: (item: T, currentValue?: T) => B, ...keys: NestedKeyOf<T>[]) {
-        let id = refCondition<string>(newId).value;
-        let mappedKeys = refCondition(() => toObject(...keys)).value
-        let [state, setState] = reactState(fn(this as any, undefined));
+        try {
+            let id = refCondition<string>(newId).value;
+            let mappedKeys = refCondition(() => toObject(...keys)).value
+            let [state, setState] = reactState(fn(this as any, undefined));
 
-        this.getEvent().add(id, {
-            func: () => {
-                let newValue = fn(this as any, state);
-                if (newValue !== state)
-                    setState(newValue);
-            },
-            keys: mappedKeys
-        });
+            this.getEvent().add(id, {
+                func: () => {
+                    let newValue = fn(this as any, state);
+                    if (newValue !== state)
+                        setState(newValue);
+                },
+                keys: mappedKeys
+            });
 
-        reactEffect(() => {
-            return () => this.getEvent().remove(id);
-        }, [])
+            reactEffect(() => {
+                return () => this.getEvent().remove(id);
+            }, [])
 
-        return state as B;
+            return state as B;
+        } catch (e) {
+            throw SmartStateError(e, { code: "useComputed", details: keys });
+        }
     }
 
     useEffect(fn: Function, ...keys: NestedKeyOf<T>[]) {
-        let id = refCondition<string>(newId).value;
-        let mappedKeys = refCondition(() => toObject(...keys)).value
-        let state = reactRef({});
-        this.getEvent().add(id, {
-            func: (items) => {
-                let newState = this.getEvent().hasChange(items, state.current);
-                if (newState.hasChanges)
-                    fn(this)
-                state.current = newState.parentState;
-            },
-            keys: mappedKeys
-        });
+        try {
+            let id = refCondition<string>(newId).value;
+            let mappedKeys = refCondition(() => toObject(...keys)).value
+            let state = reactRef({});
+            this.getEvent().add(id, {
+                func: (items) => {
+                    let newState = this.getEvent().hasChange(items, state.current);
+                    if (newState.hasChanges)
+                        fn(this)
+                    state.current = newState.parentState;
+                },
+                keys: mappedKeys
+            });
 
-        reactEffect(() => {
-            return () => this.getEvent().remove(id);
-        }, [])
+            reactEffect(() => {
+                return () => this.getEvent().remove(id);
+            }, [])
+        } catch (e) {
+            throw SmartStateError(e, { code: "useEffect", details: keys });
+        }
     }
 
     unbind(path: NestedKeyOf<T>) {
@@ -110,93 +122,100 @@ class Create<T extends object> {
 
 
         } catch (e) {
-            console.warn("was unable to unbind ", path, e)
+            throw SmartStateError(e, { code: "unbind", details: path });
         }
 
         return this;
     }
 
     localBind(path: NestedKeyOf<T>) {
-        const [state, setState] = reactState();
-        const id = refCondition(newId).value;
-        const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
-        const mappedKeys = refCondition(() => toObject(path)).value;
-        if (!this.getEvent().localBindedEvents.has(path)) {
-            this.getEvent().localBindedEvents.set(path, new FastList<boolean>());
-            this.bind(path);
-        }
-        this.getEvent().localBindedEvents.get(path).set(id, true);
-        this.getEvent().add(id, {
-            func: (items) => {
-                let newState = this.getEvent().hasChange(items, state);
-                const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
-                if (update)
-                    setState({ ...newState.parentState });
-            },
-            keys: mappedKeys,
-            type: "Path"
-        });
+        try {
+            const [state, setState] = reactState();
+            const id = refCondition(newId).value;
+            const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
+            const mappedKeys = refCondition(() => toObject(path)).value;
+            if (!this.getEvent().localBindedEvents.has(path)) {
+                this.getEvent().localBindedEvents.set(path, new FastList<boolean>());
+                this.bind(path);
+            }
+            this.getEvent().localBindedEvents.get(path).set(id, true);
+            this.getEvent().add(id, {
+                func: (items) => {
+                    let newState = this.getEvent().hasChange(items, state);
+                    const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
+                    if (update)
+                        setState({ ...newState.parentState });
+                },
+                keys: mappedKeys,
+                type: "Path"
+            });
 
-        reactEffect(() => {
-            return () => {
-                this.getEvent().remove(id);
-                this.getEvent().localBindedEvents.get(path)?.delete(id)
-                if (!this.getEvent().localBindedEvents.get(path)?.hasValue) {
-                    this.getEvent().localBindedEvents.delete(path);
-                    this.unbind(path);
+            reactEffect(() => {
+                return () => {
+                    this.getEvent().remove(id);
+                    this.getEvent().localBindedEvents.get(path)?.delete(id)
+                    if (!this.getEvent().localBindedEvents.get(path)?.hasValue) {
+                        this.getEvent().localBindedEvents.delete(path);
+                        this.unbind(path);
+                    }
+                }
+            }, []);
+
+            return {
+                on: (fn: (item) => boolean) => {
+                    hookSettings.on = fn;
+                    return this as any;
                 }
             }
-        }, []);
-
-        return {
-            on: (fn: (item) => boolean) => {
-                hookSettings.on = fn;
-                return this as any;
-            }
+        } catch (e) {
+            throw SmartStateError(e, { code: "localBind", details: path });
         }
     }
 
 
     bind(path: NestedKeyOf<T>, autoUnbind?: boolean, rebind?: boolean) {
-        if (!this.getEvent().addedPaths.has(path) || rebind) {
-            this.getEvent().addedPaths.set(path, path);
-            let item = this;
-            let key = path.split(".").reverse()[0];
-            for (let p of path.split(".")) {
-                if (typeof item[p] === "object") {
-                    item = item[p];
-                } else break;
-            }
+        try {
+            if (!this.getEvent().addedPaths.has(path) || rebind) {
+                this.getEvent().addedPaths.set(path, path);
+                let item = this;
+                let key = path.split(".").reverse()[0];
+                for (let p of path.split(".")) {
+                    if (typeof item[p] === "object") {
+                        item = item[p];
+                    } else break;
+                }
 
-            if (item && !isArray(item) && valid(item)) {
-                let v = item[key];
-                Object.defineProperty(item, key, {
-                    enumerable: true,
-                    configurable: true,
-                    get: () => v,
-                    set: (value: any) => {
-                        let newValue = { oldValue: v, newValue: value };
-                        if (value !== v) {
-                            v = value;
-                            this.getEvent().onChange(path, newValue);
+                if (item && !isArray(item) && valid(item)) {
+                    let v = item[key];
+                    Object.defineProperty(item, key, {
+                        enumerable: true,
+                        configurable: true,
+                        get: () => v,
+                        set: (value: any) => {
+                            let newValue = { oldValue: v, newValue: value };
+                            if (value !== v) {
+                                v = value;
+                                this.getEvent().onChange(path, newValue);
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
-        }
 
-        if (autoUnbind) {
-            reactEffect(() => {
-                () => this.unbind(path);
-            }, []);
+            if (autoUnbind) {
+                reactEffect(() => {
+                    () => this.unbind(path);
+                }, []);
+            }
+        } catch (e) {
+            throw SmartStateError(e, { code: "bind", details: path });
         }
-
         return this;
     }
 
     constructor(item?: CreateItem<T>) {
         if (item)
-            this.init(item);
+            this.initializeStateItem(item);
     }
 
     getEvent() {
@@ -207,55 +226,55 @@ class Create<T extends object> {
         return "react-smart-state-item";
     }
 
-    private init(data: CreateItem<any>) {
-        if (data.parentItem === undefined) {
-            data.parentItem = this;
-            this.#events = new EventTrigger(data.ignoreKeys);
-        }
-
-        let { item, parent, parentItem, arrayParser } = data;
-        let { ignoreKeys } = parentItem.getEvent();
-        let parentKeys = (key: string) => {
-            if (parent && parent.length > 0) return `${parent}.${key}`;
-            return key;
-        };
-
-        const parse = (val: any, parentKey: string) => {
-            try {
-                const cache = parentItem.getEvent().seen;
-                let value = val;
-                if (!ignoreKeys[parentKey] && valid(value, arrayParser)) {
-                    if (cache.has(value)) {
-                        // Cycle detected, return existing instance
-                        return cache.get(value);
-                    }
-
-                    value = clone(value);
-                    if (isArray(value)) {
-                        // Parse each array item recursively
-                        let arr: ObservableArray<T> = new ObservableArray(parentKey,
-                            (item, index) => parse(item, parentKey),
-                            (a, b, changes) => parentItem.getEvent().onChange(changes.key, changes));
-                        arr.push(...value);
-                        arr.hasInit = true;
-                        return arr;
-                    } else {
-                        // Create a placeholder instance and set it immediately
-                        const newInstance = new Create();
-                        cache.set(val, newInstance);
-                        // Now call the constructor logic on the placeholder instance
-                        newInstance.init({ item: value, parent: parentKey, parentItem, ignoreKeys, arrayParser });
-                        // Create a new Create instance and store in 'seen' map
-                        return newInstance;
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-            }
-            return val;
-        };
-
+    private initializeStateItem(data: CreateItem<any>) {
         try {
+            if (data.parentItem === undefined) {
+                data.parentItem = this;
+                this.#events = new EventTrigger(data.ignoreKeys, data.hardIgnoreKeys);
+            }
+
+            let { item, parent, parentItem, arrayParser } = data;
+            let { ignoreKeys, hardIgnoreKeys } = parentItem.getEvent();
+            let parentKeys = (key: string) => {
+                if (parent && parent.length > 0) return `${parent}.${key}`;
+                return key;
+            };
+
+            const parse = (val: any, parentKey: string) => {
+                try {
+                    const cache = parentItem.getEvent().seen;
+                    let value = val;
+                    if (!ignoreKeys[parentKey] && valid(value, arrayParser)) {
+                        if (cache.has(value)) {
+                            // Cycle detected, return existing instance
+                            return cache.get(value);
+                        }
+
+                        value = clone(value);
+                        if (isArray(value)) {
+                            // Parse each array item recursively
+                            let arr: ObservableArray<T> = new ObservableArray(parentKey,
+                                (item, index) => parse(item, parentKey),
+                                (a, b, changes) => parentItem.getEvent().onChange(changes.key, changes));
+                            arr.push(...value);
+                            arr.hasInit = true;
+                            return arr;
+                        } else {
+                            // Create a placeholder instance and set it immediately
+                            const newInstance = new Create();
+                            cache.set(val, newInstance);
+                            // Now call the constructor logic on the placeholder instance
+                            newInstance.initializeStateItem({ item: value, parent: parentKey, parentItem, arrayParser });
+                            // Create a new Create instance and store in 'seen' map
+                            return newInstance;
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+                return val;
+            };
+
             for (let k of keys(item, Create.prototype)) {
                 let parentKey = parentKeys(k);
                 let v = parse(item[k], parentKey);
@@ -293,7 +312,7 @@ class Create<T extends object> {
                 });
             }
         } catch (e) {
-            console.error(e);
+            throw SmartStateError(e, { code: "initializeStateItem", details: data });
         }
     }
 }
@@ -307,6 +326,7 @@ class StateBuilder<T extends object> {
     private item: T | (() => T);
     private initilized?: Create<T> & LocalStateManagment<T>;
     private ignoreKeys: NestedKeyOf<T>[] = [];
+    private hardIgnoreKeys: NestedKeyOf<T>[] = [];
     private bindKeys: NestedKeyOf<T>[] = [];
     private localBindKeys: NestedKeyOf<T>[] = [];
     private timeoutSpeed?: number = -1;
@@ -355,6 +375,18 @@ class StateBuilder<T extends object> {
         return this;
     }
 
+    /**
+     * Prevents state updates for specific nested keys.
+     * Any state update attempt on the specified keys will be ignored.
+     * still keys added to .hook will override this settings
+     *
+     * @param keys - Array of nested key paths (e.g. 'user.name', 'settings.theme')
+     * @returns The current instance (for chaining)
+     */
+    ignoreUpdatesFor(...keys: NestedKeyOf<T>[]): this {
+        this.hardIgnoreKeys = keys;
+        return this;
+    }
 
     /**
      * Ignores specified nested keys from being proxied/reactive.
@@ -400,12 +432,13 @@ class StateBuilder<T extends object> {
             $this.initilized = new Create({
                 item: getItem($this.item),
                 ignoreKeys: toObject(...$this.ignoreKeys),
+                hardIgnoreKeys: toObject(...$this.hardIgnoreKeys),
                 arrayParser: this.arrayParser ?? false
             }) as any;
 
             // Apply timeout settings
             $this.initilized.getEvent().speed = $this.timeoutSpeed === -1
-                ? undefined
+                ? 0
                 : $this.timeoutSpeed;
 
             $this.initilized.getEvent().stateType = "Local";
@@ -447,6 +480,7 @@ class StateBuilder<T extends object> {
             this.initilized = new Create({
                 item: getItem(this.item),
                 ignoreKeys: toObject(...this.ignoreKeys),
+                hardIgnoreKeys: toObject(...this.hardIgnoreKeys),
                 arrayParser: this.arrayParser ?? false
             }) as any;
 

@@ -31,7 +31,7 @@ Use `buildState()` to create and configure a local or global state instance.
 | `bind(...paths)` | Globally binds a property inside an ignored object to allow reactivity. |
 | `localBind(...path)` | Same as `bind`, but only applies to the local component. |
 | `onInit(fn: (state) => Promise<void>)` | Called once asynchronously when the state is initialized. |
-| `timeout(ms: number | undefined)` | Sets a delay (in ms) for batching updates. Use `undefined` to disable. Default is `2ms` for global. |
+| `timeout(ms: number | undefined)` | Sets a delay (in ms) for batching updates. Use `undefined` to disable. Default is `2ms` for global and 0 for local. |
 | `build()` | Builds a **local** (component-scoped) state. |
 | `globalBuild()` | Builds a **global** shared state instance. |
 

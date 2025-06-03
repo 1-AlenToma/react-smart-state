@@ -1,6 +1,38 @@
 import { newId } from "./methods";
 import { EventItem, WaitngItem, StateType, IEventTrigger, IFastList, ChangeType, ReactSmartStateInstanceItems, SmartStateInstanceNames } from "./types";
 
+export class CustomError extends Error {
+    originalError: unknown;
+    code?: string;
+    details?: any;
+
+    constructor(message: string, options: {
+        originalError?: unknown;
+        code?: string;
+        details?: any;
+    } = {}) {
+        super(message);
+        this.name = 'react-smart-state-Error'.toUpperCase();
+        this.originalError = options.originalError;
+        this.code = options.code;
+        this.details = options.details;
+
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+
+    toJSON() {
+        return {
+            name: this.name,
+            message: this.message,
+            code: this.code,
+            details: this.details,
+            originalError: this.originalError,
+            stack: this.stack,
+        };
+    }
+
+}
+
 export class EventTrigger implements IEventTrigger {
     events: Record<string, EventItem> = {};
     timer: any = undefined;
@@ -11,10 +43,12 @@ export class EventTrigger implements IEventTrigger {
     stateType: StateType;
     batching: IFastList<Function, number> = new FastList<Function, number>();
     seen: WeakMap<any, any> = new WeakMap();
-    ignoreKeys: Record<string, boolean>;
+    ignoreKeys: Record<string, boolean> = {};
+    hardIgnoreKeys: Record<string, boolean> = {};
 
-    constructor(ignoredKeys) {
-        this.ignoreKeys = ignoredKeys;
+    constructor(ignoredKeys: Record<string, boolean>, hardIgnoreKeys: Record<string, boolean>) {
+        this.ignoreKeys = ignoredKeys ?? {};
+        this.hardIgnoreKeys = hardIgnoreKeys ?? {};
     }
 
     add(id: string, item: EventItem) {
@@ -42,7 +76,7 @@ export class EventTrigger implements IEventTrigger {
     }
 
 
-    triggerSavedChanges() {
+    async triggerSavedChanges() {
         clearTimeout(this.timer); // Proper debouncing
         if (this.batching.size > 0)
             return;
@@ -68,7 +102,7 @@ export class EventTrigger implements IEventTrigger {
         });
     }
 
-    trigger(event: { eventId: string, event: EventItem }, key: string, oldValue: any, newValue: any) {
+    async trigger(event: { eventId: string, event: EventItem }, key: string, oldValue: any, newValue: any) {
         clearTimeout(this.timer); // Proper debouncing
         const { eventId, event: evt } = event;
 
@@ -84,13 +118,13 @@ export class EventTrigger implements IEventTrigger {
 
     }
 
-    onChange(key: string, { oldValue, newValue }) {
+    async onChange(key: string, { oldValue, newValue }) {
         try {
             clearTimeout(this.timer); // Proper debouncing
             // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
             const parts = key.split(".");
             for (const [eventId, event] of Object.entries(this.events)) {
-                if ((event.keys.AllKeys && (!this.addedPaths.has(key)) && !this.ignoreKeys[key]) || event.keys[key]) {
+                if ((event.keys.AllKeys && !this.addedPaths.has(key) && !this.hardIgnoreKeys[key]) || event.keys[key]) {
                     this.trigger({ eventId, event }, key, oldValue, newValue);
                     continue;
                 }

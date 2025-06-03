@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { ReactSmartStateInstanceItems } from "./types";
+import { CustomError } from "./objects";
 export const reactEffect = useEffect as any;
 export const reactRef = useRef as any;
 export const reactState = useState as any;
@@ -12,6 +13,22 @@ export function updater() {
             setValue(prev => (prev < 1000 ? prev + 1 : 1));
         }
     });
+}
+
+export function SmartStateError(
+    err: unknown,
+    extraInfo?: { code?: string; details?: any }
+): CustomError {
+    const message =
+        err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+
+    const item = new CustomError(message, {
+        originalError: err,
+        code: extraInfo?.code,
+        details: extraInfo?.details,
+    });
+    console.error(item);
+    return item;
 }
 
 export const clone = (o: any) => {

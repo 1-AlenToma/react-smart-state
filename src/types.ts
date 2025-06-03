@@ -1,3 +1,37 @@
+type IsPlainObject<T> =
+    T extends object
+    ? T extends Function
+    ? false
+    : T extends any[]
+    ? false
+    : T extends Date | RegExp
+    ? false
+    : true
+    : false;
+
+type Prev = [never, 0, 1, 2, 3, 4, 5];
+
+export type NestedKeyOf<
+    T,
+    D extends number = 4
+> = [D] extends [never]
+    ? never
+    : T extends object
+    ? {
+        [K in keyof T & string]:
+        T[K] extends (...args: any[]) => any
+        ? `${K}` // allow user-defined functions as leaf
+        : T[K] extends Array<infer U>
+        ? IsPlainObject<U> extends true
+        ? `${K}` | `${K}.${NestedKeyOf<U, Prev[D]>}` // recurse into array of objects
+        : `${K}` // array of primitives = leaf
+        : IsPlainObject<T[K]> extends true
+        ? `${K}` | `${K}.${NestedKeyOf<T[K], Prev[D]>}`
+        : `${K}`;
+    }[keyof T & string]
+    : never;
+
+
 export interface IFastList<T, Key extends string | number | symbol = string> {
     // Core operations
     set(key: Key, item: T): T;
@@ -38,6 +72,7 @@ export type IEventTrigger = {
     onChange(key: string, { oldValue, newValue }): void;
     hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>): { hasChanges: boolean, parentState: any };
     seen: WeakMap<any, any>;
+    hardIgnoreKeys: Record<string, boolean>;
 }
 
 export type SmartStateInstanceNames = "react-smart-state-array" | "react-smart-state-item";
@@ -51,24 +86,6 @@ export type IPrivateCreate<T extends object> = {
     bind(path: NestedKeyOf<T>, autoUnbind?: boolean, rebind?: boolean): Omit<ReturnState<T>, "bind"> & IPrivateCreate<T>;
 } & ReactSmartStateInstanceItems;
 
-
-export type NestedKeyOf<
-    T extends object,
-    D extends any[] = [0, 0, 0, 0, 0]
-> = D extends [any, ...infer DD]
-    ? {
-        [K in keyof T & (string | number)]:
-        T[K] extends (...args: any[]) => any
-        ? never
-        : T[K] extends Array<infer U>
-        ? U extends object
-        ? `${K}` | `${K}.${NestedKeyOf<U, DD>}`
-        : `${K}`
-        : T[K] extends object
-        ? `${K}` | `${K}.${NestedKeyOf<T[K], DD>}`
-        : `${K}`;
-    }[keyof T & (string | number)]
-    : never;
 
 
 export type WaitngItem = { key: string, oldValue: any, newValue: any };
@@ -179,7 +196,8 @@ export type CreateItem<T extends object> = {
     item: T;
     parent?: string;
     parentItem?: Omit<ReturnState<T>, "bind"> & IPrivateCreate<T>;
-    ignoreKeys: Record<string, boolean>;
+    ignoreKeys?: Record<string, boolean>;
+    hardIgnoreKeys?: Record<string, boolean>;
     arrayParser: boolean;
 }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import buildState from 'react-smart-state';
-import StateItem from "../testItems/StateItem";
+import StateItem, { B } from "../testItems/StateItem";
 const display = (item: any, seen = new WeakSet(), indent = 0, k?: string): string => {
   if (k == "selfRef")
     return "";
@@ -71,11 +71,12 @@ const globalState = buildState({
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const fetch = async (g) => {
-  let item = new StateItem();
+  let item = new B();
   item.name = "hahaha";
   item.counter = 1005;
   await sleep(1000);
-  g.test = item;
+  g.voices = item;
+  console.log(g.voices)
 }
 
 
@@ -91,6 +92,8 @@ const LocalComponent = ({ state }: any) => {
   )
 }
 
+
+
 // Component
 const TestSmartState = () => {
   // Hook usage for reaction (e.g., logging or effects)
@@ -101,12 +104,14 @@ const TestSmartState = () => {
     itemA: 0,
     item: { a: 0 },
     test: new StateItem(),
+    voices: undefined,
+    el: undefined as undefined | any,
     derived: 0,
     items: [...arr],
     items2: [new StateItem(), new StateItem(), new StateItem()]
-  }))
+  })).onInit(fetch)
     .parseArray()
-    .ignore("test.counter", "item", "test.selfRef", "items.counter") // test .ignore()
+    .ignore("test.counter", "item", "test.selfRef", "items.counter", "voices") // test .ignore()
     .localBind("test.counter", "items.counter") // bind local values
     .build();
 
@@ -132,7 +137,7 @@ const TestSmartState = () => {
   }, "counter");
 
 
-  //console.log("item.a.Updated", state.item.a)
+  console.log("item.a.Updated", state.item.a)
   return (
     <div style={{ fontFamily: "monospace" }}>
       <h3>Local State</h3>
@@ -144,7 +149,7 @@ const TestSmartState = () => {
       <LocalComponent state={state} />
 
       <button onClick={() => {
-        state.items = state.items2;
+        state.item = { a: 200 }
       }}>
         reset Array
       </button>

@@ -7,7 +7,7 @@ class A {
   }
 }
 
-class B extends A {
+export class B extends A {
   userName: string = "Alen";
   selfRef: B;
   constructor() {
@@ -21,6 +21,10 @@ class B extends A {
 
   set name(name: string) {
     this.userName = name;
+  }
+
+  get _userName() {
+    return this.userName;
   }
 }
 
