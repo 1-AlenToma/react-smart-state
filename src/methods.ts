@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+import { ReactSmartStateInstanceItems } from "./types";
 export const reactEffect = useEffect as any;
 export const reactRef = useRef as any;
 export const reactState = useState as any;
@@ -11,6 +12,24 @@ export function updater() {
             setValue(prev => (prev < 1000 ? prev + 1 : 1));
         }
     });
+}
+
+export const clone = (o: any) => {
+    if (!valid(o, true))
+        return o;
+    let item: ReactSmartStateInstanceItems = o;
+    if (item.getInstanceType?.() === "react-smart-state-item")
+        return { ...item };
+    if (item.getInstanceType?.() === "react-smart-state-array")
+        return [...o];
+    return o;
+}
+
+export const isSame = (a, b) => {
+    if (valid(a, true) && valid(b, true)) {
+        return a === b;
+    }
+    return false;
 }
 
 let ids = new Map();
@@ -110,14 +129,24 @@ export const getValueByPath = (value: any, path: string) => {
     return current;
 };
 
+export const isArray = (item: any) => {
+    if (item == undefined || item === null) return false;
+    if (Array.isArray(item) || (item as ReactSmartStateInstanceItems).getInstanceType?.() === "react-smart-state-array")
+        return true;
+
+    return false;
+}
+
 export const valid = (item: any, validArray?: boolean) => {
     if (item == undefined || item === null) return false;
     if (item instanceof Set) return false;
     if (item instanceof Map) return false;
     if (typeof item === "function") return false;
     if (typeof item === "string") return false;
-    if (validArray && Array.isArray(item) && item.length > 0) {
-        return valid(item[0]) as boolean;
+    if (isArray(item) && item.length > 0) {
+        if (validArray)
+            return valid(item[0]) as boolean;
+        return false;
     }
     return typeof item === "object";
 };

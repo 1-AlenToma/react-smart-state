@@ -1,7 +1,10 @@
 import React from 'react';
 import buildState from 'react-smart-state';
 import StateItem from "../testItems/StateItem";
-const display = (item: any, seen = new WeakSet(), indent = 0): string => {
+const display = (item: any, seen = new WeakSet(), indent = 0, k?: string): string => {
+  if (k == "selfRef")
+    return "";
+
   if (item === null || typeof item !== "object") {
     return String(item);
   }
@@ -19,7 +22,8 @@ const display = (item: any, seen = new WeakSet(), indent = 0): string => {
 
   // Get all own and inherited enumerable keys
   let current = item;
-  while (current && current !== Object.prototype) {
+
+  while (current && current !== Object.prototype && !Array.isArray(item)) {
     for (const key of Reflect.ownKeys(current)) {
       if (typeof key === "string" || typeof key === "symbol") {
         allKeys.add(key);
@@ -29,7 +33,7 @@ const display = (item: any, seen = new WeakSet(), indent = 0): string => {
   }
 
   for (const key of allKeys) {
-    if (typeof key === "symbol") continue; // skip symbol keys for readability
+    if (typeof key === "symbol" || key == "selfRef") continue; // skip symbol keys for readability
 
     let value;
     try {
@@ -42,7 +46,10 @@ const display = (item: any, seen = new WeakSet(), indent = 0): string => {
       return str.trim();
 
     if (typeof value === "object" && value !== null) {
-      str += `${pad}${key}:${display(value, seen, indent + 1)} `;
+      if (Array.isArray(value))
+        str += `\n${pad}${key}:[\n${value.map(x => display(x, seen, indent + 1)).join("\n")}\n]`;
+      else
+        str += `${pad}${key}:${display(value, seen, indent + 1, key)} `;
     } else {
       str += `${pad}${key}:${value} `;
     }
@@ -72,6 +79,8 @@ const fetch = async (g) => {
 }
 
 
+const arr = [new StateItem(), new StateItem(), new StateItem()];
+
 const LocalComponent = ({ state }: any) => {
   state.localBind("item.a")
 
@@ -88,14 +97,17 @@ const TestSmartState = () => {
   globalState.hook("item").on(g => g.item.counter >= 3);
 
   // Local state
-  const state = buildState({
+  const state = buildState(() => ({
     itemA: 0,
     item: { a: 0 },
     test: new StateItem(),
-    derived: 0
-  }).onInit(fetch)
-    .ignore("test.counter", "item") // test .ignore()
-    .localBind("test.counter") // bind local values
+    derived: 0,
+    items: [...arr],
+    items2: [new StateItem(), new StateItem(), new StateItem()]
+  }))
+    .parseArray()
+    .ignore("test.counter", "item", "test.selfRef", "items.counter") // test .ignore()
+    .localBind("test.counter", "items.counter") // bind local values
     .build();
 
   const cmValue = state.useComputed((g, current) => {
@@ -120,7 +132,7 @@ const TestSmartState = () => {
   }, "counter");
 
 
-  console.log("item.a.Updated", state.item.a)
+  //console.log("item.a.Updated", state.item.a)
   return (
     <div style={{ fontFamily: "monospace" }}>
       <h3>Local State</h3>
@@ -130,8 +142,14 @@ const TestSmartState = () => {
       <h3>cmValue</h3>
       <pre>{display({ cmValue })}</pre>
       <LocalComponent state={state} />
+
       <button onClick={() => {
-        state.item.a++;
+        state.items = state.items2;
+      }}>
+        reset Array
+      </button>
+      <button onClick={() => {
+        state.items[0].counter++
       }}>
         increase item.a
       </button>
@@ -142,6 +160,7 @@ const TestSmartState = () => {
 
           });
           state.batch(async () => {
+            state.items.push(new StateItem());
             for (let i = 0; i < 100; i++) {
               state.item.a++;
             }

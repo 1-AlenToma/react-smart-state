@@ -1,4 +1,5 @@
-import { EventItem, WaitngItem, StateType, IEventTrigger, IFastList } from "./types";
+import { newId } from "./methods";
+import { EventItem, WaitngItem, StateType, IEventTrigger, IFastList, ChangeType, ReactSmartStateInstanceItems, SmartStateInstanceNames } from "./types";
 
 export class EventTrigger implements IEventTrigger {
     events: Record<string, EventItem> = {};
@@ -9,6 +10,12 @@ export class EventTrigger implements IEventTrigger {
     speed?: number = 2;
     stateType: StateType;
     batching: IFastList<Function, number> = new FastList<Function, number>();
+    seen: WeakMap<any, any> = new WeakMap();
+    ignoreKeys: Record<string, boolean>;
+
+    constructor(ignoredKeys) {
+        this.ignoreKeys = ignoredKeys;
+    }
 
     add(id: string, item: EventItem) {
         item.type = item.type ?? "Auto";
@@ -83,7 +90,7 @@ export class EventTrigger implements IEventTrigger {
             // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
             const parts = key.split(".");
             for (const [eventId, event] of Object.entries(this.events)) {
-                if ((event.keys.AllKeys && (!this.addedPaths.has(key))) || event.keys[key]) {
+                if ((event.keys.AllKeys && (!this.addedPaths.has(key)) && !this.ignoreKeys[key]) || event.keys[key]) {
                     this.trigger({ eventId, event }, key, oldValue, newValue);
                     continue;
                 }
@@ -199,5 +206,72 @@ export class FastList<T, Key extends string | number | symbol = string> implemen
 
     get size(): number {
         return this.length;
+    }
+}
+
+
+
+
+export class ObservableArray<T> extends Array<T> implements ReactSmartStateInstanceItems {
+    getInstanceType(): SmartStateInstanceNames {
+        return "react-smart-state-array"
+    }
+    hasInit?: boolean;
+    constructor(
+        private readonly parentKey: string,
+        private readonly process: (item: T, index: number, parentKey: string) => T,
+        private readonly onChange?: (action: ChangeType, items: T[], changes: WaitngItem) => void
+    ) {
+        super();
+        // Required to fix instanceof issues when extending Array
+        Object.setPrototypeOf(this, ObservableArray.prototype);
+    }
+
+    private getChanges() {
+        // always update
+        const item: WaitngItem = { key: this.parentKey, oldValue: true, newValue: newId() }
+        return item;
+    }
+
+    override push(...items: T[]): number {
+        const processed = items.map((item, index) => this.process(item, index, this.parentKey));
+        const result = super.push(...processed);
+        if (processed.length && this.hasInit) this.onChange?.('add', processed, this.getChanges());
+        return result;
+    }
+
+    override unshift(...items: T[]): number {
+        const processed = items.map((item, index) => this.process(item, index, this.parentKey));
+        const result = super.unshift(...processed);
+        if (processed.length && this.hasInit) this.onChange?.('add', processed, this.getChanges());
+        return result;
+    }
+
+    override pop(): T | undefined {
+        const removed = super.pop();
+        if (removed !== undefined && this.hasInit) this.onChange?.('remove', [removed], this.getChanges());
+        return removed;
+    }
+
+    override shift(): T | undefined {
+        const removed = super.shift();
+        if (removed !== undefined && this.hasInit) this.onChange?.('remove', [removed], this.getChanges());
+        return removed;
+    }
+
+    override splice(start: number, deleteCount?: number, ...items: T[]): T[] {
+        const processed = items.map((item, index) => this.process(item, index, this.parentKey));
+        const removed = super.splice(start, deleteCount ?? this.length, ...processed);
+        if (removed.length && this.hasInit) this.onChange?.('remove', removed, this.getChanges());
+        if (processed.length && this.hasInit) this.onChange?.('add', processed, this.getChanges());
+        return removed;
+    }
+
+    clear(): void {
+        if (this.length > 0) {
+            const removed = this.splice(0);
+            if (this.hasInit)
+                this.onChange?.('remove', removed, this.getChanges());
+        }
     }
 }

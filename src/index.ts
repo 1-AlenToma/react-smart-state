@@ -1,6 +1,6 @@
-import { getItem, getValueByPath, keys, newId, reactEffect, reactRef, reactState, refCondition, toObject, updater, valid } from "./methods";
-import { EventTrigger, FastList } from "./objects";
-import { CreateItem, IEventTrigger, IPrivateCreate, LocalStateManagment, NestedKeyOf, ReturnState } from "./types";
+import { clone, getItem, getValueByPath, isArray, isSame, keys, newId, reactEffect, reactRef, reactState, refCondition, toObject, updater, valid } from "./methods";
+import { EventTrigger, FastList, ObservableArray } from "./objects";
+import { CreateItem, IEventTrigger, IPrivateCreate, LocalStateManagment, NestedKeyOf, ReturnState, SmartStateInstanceNames } from "./types";
 export * from "./methods";
 export * from "./types";
 export * from "./objects";
@@ -91,7 +91,7 @@ class Create<T extends object> {
         }, [])
     }
 
-    unbind(path: string) {
+    unbind(path: NestedKeyOf<T>) {
         try {
             if (!this.getEvent().addedPaths.has(path)) return; // not bound, do nothing
             this.getEvent().addedPaths.delete(path);
@@ -102,7 +102,7 @@ class Create<T extends object> {
                     item = item[p];
                 } else break;
             }
-            if (item) {
+            if (item && !isArray(item) && valid(item)) {
                 let v = item[key];
                 delete item[key];
                 item[key] = v;
@@ -116,7 +116,7 @@ class Create<T extends object> {
         return this;
     }
 
-    localBind(path: string) {
+    localBind(path: NestedKeyOf<T>) {
         const [state, setState] = reactState();
         const id = refCondition(newId).value;
         const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
@@ -157,7 +157,7 @@ class Create<T extends object> {
     }
 
 
-    bind(path: string, autoUnbind?: boolean, rebind?: boolean) {
+    bind(path: NestedKeyOf<T>, autoUnbind?: boolean, rebind?: boolean) {
         if (!this.getEvent().addedPaths.has(path) || rebind) {
             this.getEvent().addedPaths.set(path, path);
             let item = this;
@@ -168,7 +168,7 @@ class Create<T extends object> {
                 } else break;
             }
 
-            if (item) {
+            if (item && !isArray(item) && valid(item)) {
                 let v = item[key];
                 Object.defineProperty(item, key, {
                     enumerable: true,
@@ -203,47 +203,48 @@ class Create<T extends object> {
         return this.#events;
     }
 
-    getInstanceType() {
+    getInstanceType(): SmartStateInstanceNames {
         return "react-smart-state-item";
     }
 
-    private init(data: CreateItem<T>) {
-
-        if (!data.seen)
-            data.seen = new WeakMap();
+    private init(data: CreateItem<any>) {
         if (data.parentItem === undefined) {
             data.parentItem = this;
-            this.#events = new EventTrigger();
+            this.#events = new EventTrigger(data.ignoreKeys);
         }
 
-        let { item, parent, parentItem, ignoreKeys, seen } = data
+        let { item, parent, parentItem, arrayParser } = data;
+        let { ignoreKeys } = parentItem.getEvent();
         let parentKeys = (key: string) => {
             if (parent && parent.length > 0) return `${parent}.${key}`;
             return key;
         };
 
-
-
-        const parse = (value: any, parentKey: string) => {
+        const parse = (val: any, parentKey: string) => {
             try {
-                if (!ignoreKeys[parentKey] && valid(value, true)) {
-                    if (seen.has(value)) {
+                const cache = parentItem.getEvent().seen;
+                let value = val;
+                if (!ignoreKeys[parentKey] && valid(value, arrayParser)) {
+                    if (cache.has(value)) {
                         // Cycle detected, return existing instance
-                        return seen.get(value);
+                        return cache.get(value);
                     }
 
-                    if (value && valid(value) && (value as IPrivateCreate<T>).getInstanceType?.() == this.getInstanceType())
-                        value = Object.assign({}, value) // create a copy
-
-                    if (Array.isArray(value)) {
+                    value = clone(value);
+                    if (isArray(value)) {
                         // Parse each array item recursively
-                        return value.map((x, i) => parse(x, `${parentKey}.${i}`));
+                        let arr: ObservableArray<T> = new ObservableArray(parentKey,
+                            (item, index) => parse(item, parentKey),
+                            (a, b, changes) => parentItem.getEvent().onChange(changes.key, changes));
+                        arr.push(...value);
+                        arr.hasInit = true;
+                        return arr;
                     } else {
                         // Create a placeholder instance and set it immediately
                         const newInstance = new Create();
-                        seen.set(value, newInstance);
+                        cache.set(val, newInstance);
                         // Now call the constructor logic on the placeholder instance
-                        newInstance.init({ item: value, parent: parentKey, parentItem, ignoreKeys, seen });
+                        newInstance.init({ item: value, parent: parentKey, parentItem, ignoreKeys, arrayParser });
                         // Create a new Create instance and store in 'seen' map
                         return newInstance;
                     }
@@ -251,23 +252,26 @@ class Create<T extends object> {
             } catch (e) {
                 console.error(e);
             }
-            return value;
+            return val;
         };
 
         try {
             for (let k of keys(item, Create.prototype)) {
                 let parentKey = parentKeys(k);
                 let v = parse(item[k], parentKey);
-                seen.delete(item[k]);
+                parentItem.getEvent().seen.delete(item[k]);
                 if (v !== item[k]) item[k] = v;
                 Object.defineProperty(this, k, {
                     enumerable: true,
                     configurable: true,
                     get: () => item[k],
                     set: (value: any) => {
+                        if (isSame(value, item[k])) {
+                            return; // do nothing as the objects are the same
+                        }
                         const newValue = { oldValue: item[k], newValue: parse(value, parentKey) };
                         item[k] = newValue.newValue;
-                        seen.delete(value);
+                        parentItem.getEvent().seen.delete(value);
                         if ((parentKey.includes(".") || k === parentKey) && valid(value)) {
                             let parts = parentKey.split(".");
                             // Traverse up from most specific to least specific (excluding the root level)
@@ -277,7 +281,7 @@ class Create<T extends object> {
                                     const pKey = k == parentKey ? k : parts.join(".");
 
                                     if (parentItem.getEvent().addedPaths.hasValue)
-                                        parentItem.getEvent().addedPaths.keys.forEach(addedKey => {
+                                        parentItem.getEvent().addedPaths.keys.forEach((addedKey: NestedKeyOf<T>) => {
                                             if (addedKey.startsWith(pKey + ".") || addedKey === pKey) {
                                                 parentItem.bind(addedKey, false, true);
                                             }
@@ -302,17 +306,28 @@ class Create<T extends object> {
 class StateBuilder<T extends object> {
     private item: T | (() => T);
     private initilized?: Create<T> & LocalStateManagment<T>;
-    private ignoreKeys: string[] = [];
-    private bindKeys: string[] = [];
-    private localBindKeys: string[] = [];
+    private ignoreKeys: NestedKeyOf<T>[] = [];
+    private bindKeys: NestedKeyOf<T>[] = [];
+    private localBindKeys: NestedKeyOf<T>[] = [];
     private timeoutSpeed?: number = -1;
     private onStateInit?: (item: T) => Promise<void>;
+    private arrayParser?: boolean;
 
     /**
      * @param item - The object to wrap in a reactive state, or a function returning it
      */
     constructor(item: T | (() => T)) {
         this.item = item;
+    }
+
+    /**
+     * create proxies for arrays items.
+     * that are not included in ignore objects.
+     * this is disabled by default for better performance.
+     */
+    parseArray() {
+        this.arrayParser = true;
+        return this;
     }
 
     /**
@@ -384,7 +399,8 @@ class StateBuilder<T extends object> {
         if ($this.initilized === undefined) {
             $this.initilized = new Create({
                 item: getItem($this.item),
-                ignoreKeys: toObject(...$this.ignoreKeys)
+                ignoreKeys: toObject(...$this.ignoreKeys),
+                arrayParser: this.arrayParser ?? false
             }) as any;
 
             // Apply timeout settings
@@ -430,7 +446,8 @@ class StateBuilder<T extends object> {
         if (this.initilized === undefined) {
             this.initilized = new Create({
                 item: getItem(this.item),
-                ignoreKeys: toObject(...this.ignoreKeys)
+                ignoreKeys: toObject(...this.ignoreKeys),
+                arrayParser: this.arrayParser ?? false
             }) as any;
 
             // Use default timeout unless explicitly set

@@ -26,6 +26,7 @@ export interface IFastList<T, Key extends string | number | symbol = string> {
 export type StateType = "Local" | "Global";
 
 export type IEventTrigger = {
+    ignoreKeys: Record<string, boolean>;
     addedPaths: IFastList<string>;
     localBindedEvents: IFastList<IFastList<boolean>, string>;
     batching: IFastList<Function, number>;
@@ -36,13 +37,19 @@ export type IEventTrigger = {
     triggerSavedChanges(): void;
     onChange(key: string, { oldValue, newValue }): void;
     hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>): { hasChanges: boolean, parentState: any };
+    seen: WeakMap<any, any>;
+}
+
+export type SmartStateInstanceNames = "react-smart-state-array" | "react-smart-state-item";
+
+export type ReactSmartStateInstanceItems = {
+    getInstanceType(): SmartStateInstanceNames;
 }
 
 export type IPrivateCreate<T extends object> = {
-    getInstanceType(): string;
     getEvent(): IEventTrigger;
-    bind(path: string, autoUnbind?: boolean, rebind?: boolean): ReturnState<T>;
-}
+    bind(path: NestedKeyOf<T>, autoUnbind?: boolean, rebind?: boolean): Omit<ReturnState<T>, "bind"> & IPrivateCreate<T>;
+} & ReactSmartStateInstanceItems;
 
 
 export type NestedKeyOf<
@@ -50,11 +57,19 @@ export type NestedKeyOf<
     D extends any[] = [0, 0, 0, 0, 0]
 > = D extends [any, ...infer DD]
     ? {
-        [K in keyof T & (string | number)]: T[K] extends object
+        [K in keyof T & (string | number)]:
+        T[K] extends (...args: any[]) => any
+        ? never
+        : T[K] extends Array<infer U>
+        ? U extends object
+        ? `${K}` | `${K}.${NestedKeyOf<U, DD>}`
+        : `${K}`
+        : T[K] extends object
         ? `${K}` | `${K}.${NestedKeyOf<T[K], DD>}`
         : `${K}`;
     }[keyof T & (string | number)]
     : never;
+
 
 export type WaitngItem = { key: string, oldValue: any, newValue: any };
 
@@ -127,14 +142,14 @@ export type ReturnState<T extends object> = {
      * @param path - The full property path to bind.
      * @param autoUnbind will use react.useffect to unbind the key
      */
-    bind(path: string, autoUnbind?: boolean): ReturnState<T>;
+    bind(path: NestedKeyOf<T>, autoUnbind?: boolean): ReturnState<T>;
 
     /**
      * Removes a previously bound event listener on the given path.
      * 
      * @param path - The full property path to unbind.
      */
-    unbind(path: string): ReturnState<T>;
+    unbind(path: NestedKeyOf<T>): ReturnState<T>;
 
     /**
      * Binds a local (component-scoped) event listener to a path.
@@ -143,7 +158,7 @@ export type ReturnState<T extends object> = {
      * @param path - The full property path to bind.
      * @returns An object with `.on()` method for subscribing.
      */
-    localBind(path: string): {
+    localBind(path: NestedKeyOf<T>): {
         /**
          * Subscribes to the locally scoped event.
          * 
@@ -161,9 +176,11 @@ export type LocalStateManagment<T extends object> = {
 
 
 export type CreateItem<T extends object> = {
-    item: T,
-    parent?: any,
-    parentItem?: Omit<ReturnState<T>, "bind"> & IPrivateCreate<T>,
-    ignoreKeys: Record<string, boolean>,
-    seen?: WeakMap<any, any>
+    item: T;
+    parent?: string;
+    parentItem?: Omit<ReturnState<T>, "bind"> & IPrivateCreate<T>;
+    ignoreKeys: Record<string, boolean>;
+    arrayParser: boolean;
 }
+
+export type ChangeType = 'add' | 'remove';
