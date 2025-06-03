@@ -11,6 +11,7 @@ export class EventTrigger implements IEventTrigger {
     batching: IFastList<Function, number> = new FastList<Function, number>();
 
     add(id: string, item: EventItem) {
+        item.type = item.type ?? "Auto";
         this.events[id] = item;
     }
 
@@ -80,12 +81,10 @@ export class EventTrigger implements IEventTrigger {
         try {
             clearTimeout(this.timer); // Proper debouncing
             // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
-            let called = false;
             const parts = key.split(".");
             for (const [eventId, event] of Object.entries(this.events)) {
-                if (event.keys.AllKeys || event.keys[key]) {
+                if ((event.keys.AllKeys && (!this.addedPaths.has(key))) || event.keys[key]) {
                     this.trigger({ eventId, event }, key, oldValue, newValue);
-                    called = true;
                     continue;
                 }
 
@@ -94,7 +93,6 @@ export class EventTrigger implements IEventTrigger {
                     const parentKey = parts.slice(0, i).join(".");
                     if (event.keys[parentKey]) {
                         this.trigger({ eventId, event }, key, oldValue, newValue);
-                        called = true;
                         break; // stop at the first match for performance
                     }
                 }

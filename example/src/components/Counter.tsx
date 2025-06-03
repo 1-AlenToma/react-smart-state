@@ -71,6 +71,17 @@ const fetch = async (g) => {
   g.test = item;
 }
 
+
+const LocalComponent = ({ state }: any) => {
+  state.localBind("item.a")
+
+  return (<div>
+    <h3>Local State</h3>
+    <pre>Item.a:{state.item.a}</pre>
+  </div>
+  )
+}
+
 // Component
 const TestSmartState = () => {
   // Hook usage for reaction (e.g., logging or effects)
@@ -84,7 +95,7 @@ const TestSmartState = () => {
     derived: 0
   }).onInit(fetch)
     .ignore("test.counter", "item") // test .ignore()
-    .localBind("item.a", "test.counter") // bind local values
+    .localBind("test.counter") // bind local values
     .build();
 
   const cmValue = state.useComputed((g, current) => {
@@ -107,7 +118,9 @@ const TestSmartState = () => {
   globalState.useEffect(() => {
     console.log("Global counter changed:", globalState.counter);
   }, "counter");
-  console.log(state.item.a)
+
+
+  console.log("item.a.Updated", state.item.a)
   return (
     <div style={{ fontFamily: "monospace" }}>
       <h3>Local State</h3>
@@ -116,7 +129,12 @@ const TestSmartState = () => {
       <pre>{display(globalState)}</pre>
       <h3>cmValue</h3>
       <pre>{display({ cmValue })}</pre>
-
+      <LocalComponent state={state} />
+      <button onClick={() => {
+        state.item.a++;
+      }}>
+        increase item.a
+      </button>
       <button
         onClick={() => {
           state.batch(async () => {

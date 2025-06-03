@@ -24,12 +24,6 @@ export interface IFastList<T, Key extends string | number | symbol = string> {
 
 
 export type StateType = "Local" | "Global";
-export type LocalEvent = {
-    bending?: boolean;
-    bendingValue?: undefined;
-    func: Function;
-    redefineItem?: boolean;
-}
 
 export type IEventTrigger = {
     addedPaths: IFastList<string>;
@@ -44,9 +38,10 @@ export type IEventTrigger = {
     hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>): { hasChanges: boolean, parentState: any };
 }
 
-export type IPrivateCreate = {
+export type IPrivateCreate<T extends object> = {
     getInstanceType(): string;
     getEvent(): IEventTrigger;
+    bind(path: string, autoUnbind?: boolean, rebind?: boolean): ReturnState<T>;
 }
 
 
@@ -67,6 +62,7 @@ export type EventItem = {
     keys: Record<string, boolean>;
     func: (item: Record<string, WaitngItem>) => void,
     item?: any;
+    type?: "Auto" | "Path";
 };
 
 /**
@@ -167,7 +163,7 @@ export type LocalStateManagment<T extends object> = {
 export type CreateItem<T extends object> = {
     item: T,
     parent?: any,
-    parentItem?: ReturnState<T> & IPrivateCreate,
+    parentItem?: Omit<ReturnState<T>, "bind"> & IPrivateCreate<T>,
     ignoreKeys: Record<string, boolean>,
     seen?: WeakMap<any, any>
 }

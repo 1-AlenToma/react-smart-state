@@ -94,6 +94,7 @@ class Create<T extends object> {
     unbind(path: string) {
         try {
             if (!this.getEvent().addedPaths.has(path)) return; // not bound, do nothing
+            this.getEvent().addedPaths.delete(path);
             let item = this;
             let key = path.split(".").reverse()[0];
             for (let p of path.split(".")) {
@@ -119,7 +120,6 @@ class Create<T extends object> {
         const [state, setState] = reactState();
         const id = refCondition(newId).value;
         const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
-        const cValue = refCondition(() => getValueByPath(this, path));
         const mappedKeys = refCondition(() => toObject(path)).value;
         if (!this.getEvent().localBindedEvents.has(path)) {
             this.getEvent().localBindedEvents.set(path, new FastList<boolean>());
@@ -133,7 +133,8 @@ class Create<T extends object> {
                 if (update)
                     setState({ ...newState.parentState });
             },
-            keys: mappedKeys
+            keys: mappedKeys,
+            type: "Path"
         });
 
         reactEffect(() => {
@@ -156,8 +157,8 @@ class Create<T extends object> {
     }
 
 
-    bind(path: string, autoUnbind?: boolean) {
-        if (!this.getEvent().addedPaths.has(path)) {
+    bind(path: string, autoUnbind?: boolean, rebind?: boolean) {
+        if (!this.getEvent().addedPaths.has(path) || rebind) {
             this.getEvent().addedPaths.set(path, path);
             let item = this;
             let key = path.split(".").reverse()[0];
@@ -231,7 +232,7 @@ class Create<T extends object> {
                         return seen.get(value);
                     }
 
-                    if (value && valid(value) && (value as IPrivateCreate).getInstanceType?.() == this.getInstanceType())
+                    if (value && valid(value) && (value as IPrivateCreate<T>).getInstanceType?.() == this.getInstanceType())
                         value = Object.assign({}, value) // create a copy
 
                     if (Array.isArray(value)) {
@@ -278,8 +279,7 @@ class Create<T extends object> {
                                     if (parentItem.getEvent().addedPaths.hasValue)
                                         parentItem.getEvent().addedPaths.keys.forEach(addedKey => {
                                             if (addedKey.startsWith(pKey + ".") || addedKey === pKey) {
-                                                parentItem.unbind(addedKey);
-                                                parentItem.bind(addedKey);
+                                                parentItem.bind(addedKey, false, true);
                                             }
                                         });
                                 }
