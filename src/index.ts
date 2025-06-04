@@ -29,9 +29,11 @@ class Create<T extends object> {
             let id = refCondition<string>(newId).value;
             let mappedKeys = refCondition(() => toObject(...keys)).value
             let [state, setState] = reactState({});
-            let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
+            let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined, isInit: false })).value;
             this.getEvent().add(id, {
                 func: items => {
+                    if (!hookSettings.isInit)
+                        return;
                     let newState = this.getEvent().hasChange(items, state);
                     const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
                     if (update)
@@ -41,6 +43,7 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
+                hookSettings.isInit = true;
                 return () => this.getEvent().remove(id);
             }, [])
 
@@ -60,9 +63,12 @@ class Create<T extends object> {
             let id = refCondition<string>(newId).value;
             let mappedKeys = refCondition(() => toObject(...keys)).value
             let [state, setState] = reactState(fn(this as any, undefined));
+            const settings = refCondition(() => ({ isInit: false })).value;
 
             this.getEvent().add(id, {
                 func: () => {
+                    if (!settings.isInit)
+                        return;
                     let newValue = fn(this as any, state);
                     if (newValue !== state)
                         setState(newValue);
@@ -71,6 +77,7 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
+                settings.isInit = true;
                 return () => this.getEvent().remove(id);
             }, [])
 
@@ -83,7 +90,7 @@ class Create<T extends object> {
     useEffect(fn: Function, ...keys: NestedKeyOf<T>[]) {
         try {
             let id = refCondition<string>(newId).value;
-            let mappedKeys = refCondition(() => toObject(...keys)).value
+            let mappedKeys = refCondition(() => toObject(...keys)).value;
             let state = reactRef({});
             this.getEvent().add(id, {
                 func: (items) => {
@@ -132,7 +139,7 @@ class Create<T extends object> {
         try {
             const [state, setState] = reactState();
             const id = refCondition(newId).value;
-            const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
+            const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined, isInit: false })).value;
             const mappedKeys = refCondition(() => toObject(path)).value;
             if (!this.getEvent().localBindedEvents.has(path)) {
                 this.getEvent().localBindedEvents.set(path, new FastList<boolean>());
@@ -141,6 +148,8 @@ class Create<T extends object> {
             this.getEvent().localBindedEvents.get(path).set(id, true);
             this.getEvent().add(id, {
                 func: (items) => {
+                    if (!hookSettings.isInit)
+                        return; // do not update as the component is not ready yet
                     let newState = this.getEvent().hasChange(items, state);
                     const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
                     if (update)
@@ -151,6 +160,7 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
+                hookSettings.isInit = true;
                 return () => {
                     this.getEvent().remove(id);
                     this.getEvent().localBindedEvents.get(path)?.delete(id)
