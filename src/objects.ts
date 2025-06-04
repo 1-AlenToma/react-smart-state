@@ -1,5 +1,5 @@
 import { newId } from "./methods";
-import { EventItem, WaitngItem, StateType, IEventTrigger, IFastList, ChangeType, ReactSmartStateInstanceItems, SmartStateInstanceNames } from "./types";
+import { EventItem, WaitngItem, StateType, IEventTrigger, IFastList, ChangeType, ReactSmartStateInstanceItems, SmartStateInstanceNames, StateKeyTypeGenerator } from "./types";
 
 export class CustomError extends Error {
     originalError: unknown;
@@ -43,8 +43,8 @@ export class EventTrigger implements IEventTrigger {
     stateType: StateType;
     batching: IFastList<Function, number> = new FastList<Function, number>();
     seen: WeakMap<any, any> = new WeakMap();
-    ignoreKeys: Record<string, boolean> = {};
-    hardIgnoreKeys: Record<string, boolean> = {};
+    ignoreKeys: StateKeyTypeGenerator;
+    hardIgnoreKeys: StateKeyTypeGenerator;
 
     constructor(ignoredKeys: Record<string, boolean>, hardIgnoreKeys: Record<string, boolean>) {
         this.ignoreKeys = ignoredKeys ?? {};
@@ -124,7 +124,8 @@ export class EventTrigger implements IEventTrigger {
             // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
             const parts = key.split(".");
             for (const [eventId, event] of Object.entries(this.events)) {
-                if ((event.keys.AllKeys && !this.addedPaths.has(key) && !this.hardIgnoreKeys[key]) || event.keys[key]) {
+                let foundPartKey = event.keys._keys?.find(x => x.startsWith(key + "."));
+                if ((event.keys.AllKeys && !this.addedPaths.has(key) && !this.hardIgnoreKeys[key]) || event.keys[key] || foundPartKey) {
                     this.trigger({ eventId, event }, key, oldValue, newValue);
                     continue;
                 }

@@ -438,7 +438,7 @@ class StateBuilder<T extends object> {
 
             // Apply timeout settings
             $this.initilized.getEvent().speed = $this.timeoutSpeed === -1
-                ? 0
+                ? undefined
                 : $this.timeoutSpeed;
 
             $this.initilized.getEvent().stateType = "Local";

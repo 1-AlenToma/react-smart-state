@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { ReactSmartStateInstanceItems } from "./types";
+import { ReactSmartStateInstanceItems, StateKeyTypeGenerator } from "./types";
 import { CustomError } from "./objects";
 export const reactEffect = useEffect as any;
 export const reactRef = useRef as any;
@@ -95,12 +95,12 @@ export function refCondition<T>(fn: () => T) {
 
 
 export const toObject = (...keys: string[]) => {
-    if (keys.length === 0) return { AllKeys: true } as Record<string, boolean>;
+    if (keys.length === 0) return { AllKeys: true, _keys: keys } as any as StateKeyTypeGenerator;
 
     return keys.reduce((c, v) => {
         c[v] = true;
         return c;
-    }, {} as Record<string, boolean>);
+    }, { _keys: keys } as any as StateKeyTypeGenerator);
 };
 
 export function getPrototypeChain(obj) {

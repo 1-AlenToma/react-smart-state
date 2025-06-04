@@ -59,8 +59,14 @@ export interface IFastList<T, Key extends string | number | symbol = string> {
 
 export type StateType = "Local" | "Global";
 
+export type StateKeyTypeGenerator = {
+    _keys?: string[];
+} & {
+    [key: string]: boolean | undefined;
+};
+
 export type IEventTrigger = {
-    ignoreKeys: Record<string, boolean>;
+    ignoreKeys: StateKeyTypeGenerator;
     addedPaths: IFastList<string>;
     localBindedEvents: IFastList<IFastList<boolean>, string>;
     batching: IFastList<Function, number>;
@@ -72,7 +78,7 @@ export type IEventTrigger = {
     onChange(key: string, { oldValue, newValue }): void;
     hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>): { hasChanges: boolean, parentState: any };
     seen: WeakMap<any, any>;
-    hardIgnoreKeys: Record<string, boolean>;
+    hardIgnoreKeys: StateKeyTypeGenerator;
 }
 
 export type SmartStateInstanceNames = "react-smart-state-array" | "react-smart-state-item";
@@ -91,7 +97,7 @@ export type IPrivateCreate<T extends object> = {
 export type WaitngItem = { key: string, oldValue: any, newValue: any };
 
 export type EventItem = {
-    keys: Record<string, boolean>;
+    keys: StateKeyTypeGenerator;
     func: (item: Record<string, WaitngItem>) => void,
     item?: any;
     type?: "Auto" | "Path";

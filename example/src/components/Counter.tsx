@@ -102,7 +102,7 @@ const TestSmartState = () => {
   // Local state
   const state = buildState(() => ({
     itemA: 0,
-    item: { a: 0 },
+    item: { a: 0, item: new StateItem() },
     test: new StateItem(),
     voices: undefined,
     el: undefined as undefined | any,
@@ -111,7 +111,7 @@ const TestSmartState = () => {
     items2: [new StateItem(), new StateItem(), new StateItem()]
   })).onInit(fetch)
     .parseArray()
-    .ignore("test.counter", "item", "test.selfRef", "items.counter", "voices") // test .ignore()
+    .ignore("test.counter", "test.selfRef", "items.counter", "voices") // test .ignore()
     .localBind("test.counter", "items.counter") // bind local values
     .build();
 
@@ -119,6 +119,10 @@ const TestSmartState = () => {
     let v = g.itemA + 10 + g.test.counter;
     return v;
   }, "itemA", "test.counter");
+
+  state.useEffect(() => {
+    console.log("item.item.counter changed")
+  }, "item.item.counter")
 
   // Side effect on a field
   state.useEffect(() => {
@@ -149,7 +153,13 @@ const TestSmartState = () => {
       <LocalComponent state={state} />
 
       <button onClick={() => {
-        state.item = { a: 200 }
+        if (state.item.item.counter <= 5)
+          state.item.item.counter++
+        else
+          state.item = { a: 200, item: new StateItem() }
+
+        console.log(state.item.a);
+        //    state.item.item.counter++;
       }}>
         reset Array
       </button>
