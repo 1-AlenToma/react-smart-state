@@ -64,7 +64,6 @@ export class EventTrigger implements IEventTrigger {
         let hasChanges = false;
         let newState = parentState ?? {};
         for (const { key, oldValue, newValue } of Object.values(items)) {
-            //    let newValue = getValueByPath(parentItem, key);
             if (oldValue !== newValue) {
                 hasChanges = true;
             }
@@ -93,11 +92,12 @@ export class EventTrigger implements IEventTrigger {
                 this.timer = setTimeout(fn, this.speed);
             }
         }
+
         trigger(() => {
             let itemKeys = this.waitingEvents.values;
             this.waitingEvents.clear();
-            for (let item of itemKeys) {
-                runHandlers(item.event, item.items.records());
+            for (let { event, items } of itemKeys) {
+                runHandlers(event, items.records());
             }
         });
     }

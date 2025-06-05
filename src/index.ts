@@ -295,29 +295,29 @@ class Create<T extends object> {
                 return val;
             };
 
-            for (let k of keys(item, Create.prototype)) {
-                let parentKey = parentKeys(k);
-                let v = parse(item[k], parentKey);
-                parentItem.getEvent().seen.delete(item[k]);
-                if (v !== item[k]) item[k] = v;
-                Object.defineProperty(this, k, {
+            for (let itemKey of keys(item, Create.prototype)) {
+                let parentKey = parentKeys(itemKey);
+                let itemValue = parse(item[itemKey], parentKey);
+                parentItem.getEvent().seen.delete(item[itemKey]);
+                if (itemValue !== item[itemKey]) item[itemKey] = itemValue;
+                Object.defineProperty(this, itemKey, {
                     enumerable: true,
                     configurable: true,
-                    get: () => item[k],
+                    get: () => item[itemKey],
                     set: (value: any) => {
-                        if (isSame(value, item[k])) {
+                        if (isSame(value, item[itemKey])) {
                             return; // do nothing as the objects are the same
                         }
-                        const newValue = { oldValue: item[k], newValue: parse(value, parentKey) };
-                        item[k] = newValue.newValue;
+                        const newValue = { oldValue: item[itemKey], newValue: parse(value, parentKey) };
+                        item[itemKey] = newValue.newValue;
                         parentItem.getEvent().seen.delete(value);
-                        if ((parentKey.includes(".") || k === parentKey) && valid(value)) {
+                        if ((parentKey.includes(".") || itemKey === parentKey) && valid(value, arrayParser)) {
                             let parts = parentKey.split(".");
                             // Traverse up from most specific to least specific (excluding the root level)
                             if (parentItem.getEvent().addedPaths.hasValue || parentItem.getEvent().localBindedEvents.hasValue)
-                                while (parts.length > 1 || (parts.length > 0 && k == parentKey)) {
+                                while (parts.length > 1 || (parts.length > 0 && itemKey == parentKey)) {
                                     parts = parts.slice(0, -1);
-                                    const pKey = k == parentKey ? k : parts.join(".");
+                                    const pKey = itemKey == parentKey ? itemKey : parts.join(".");
 
                                     if (parentItem.getEvent().addedPaths.hasValue)
                                         parentItem.getEvent().addedPaths.keys.forEach((addedKey: NestedKeyOf<T>) => {
