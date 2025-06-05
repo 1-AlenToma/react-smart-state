@@ -29,11 +29,9 @@ class Create<T extends object> {
             let id = refCondition<string>(newId).value;
             let mappedKeys = refCondition(() => toObject(...keys)).value
             let [state, setState] = reactState({});
-            let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined, isInit: false })).value;
+            let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
             this.getEvent().add(id, {
                 func: items => {
-                    if (!hookSettings.isInit)
-                        return;
                     let newState = this.getEvent().hasChange(items, state);
                     const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
                     if (update)
@@ -43,7 +41,6 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
-                hookSettings.isInit = true;
                 return () => this.getEvent().remove(id);
             }, [])
 
@@ -63,12 +60,9 @@ class Create<T extends object> {
             let id = refCondition<string>(newId).value;
             let mappedKeys = refCondition(() => toObject(...keys)).value
             let [state, setState] = reactState(fn(this as any, undefined));
-            const settings = refCondition(() => ({ isInit: false })).value;
 
             this.getEvent().add(id, {
                 func: () => {
-                    if (!settings.isInit)
-                        return;
                     let newValue = fn(this as any, state);
                     if (newValue !== state)
                         setState(newValue);
@@ -77,7 +71,6 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
-                settings.isInit = true;
                 return () => this.getEvent().remove(id);
             }, [])
 
@@ -91,12 +84,9 @@ class Create<T extends object> {
         try {
             let id = refCondition<string>(newId).value;
             let mappedKeys = refCondition(() => toObject(...keys)).value;
-            const settings = refCondition(() => ({ isInit: false })).value;
             let state = reactRef({});
             this.getEvent().add(id, {
                 func: (items) => {
-                    if (!settings.isInit)
-                        return;
                     let newState = this.getEvent().hasChange(items, state.current);
                     if (newState.hasChanges)
                         fn(this)
@@ -106,7 +96,6 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
-                settings.isInit = true;
                 return () => this.getEvent().remove(id);
             }, [])
         } catch (e) {
@@ -143,7 +132,7 @@ class Create<T extends object> {
         try {
             const [state, setState] = reactState();
             const id = refCondition(newId).value;
-            const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined, isInit: false })).value;
+            const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
             const mappedKeys = refCondition(() => toObject(path)).value;
             if (!this.getEvent().localBindedEvents.has(path)) {
                 this.getEvent().localBindedEvents.set(path, new FastList<boolean>());
@@ -152,8 +141,6 @@ class Create<T extends object> {
             this.getEvent().localBindedEvents.get(path).set(id, true);
             this.getEvent().add(id, {
                 func: (items) => {
-                    if (!hookSettings.isInit)
-                        return; // do not update as the component is not ready yet
                     let newState = this.getEvent().hasChange(items, state);
                     const update = newState.hasChanges && (!hookSettings.on || hookSettings.on(this));
                     if (update)
@@ -164,7 +151,6 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
-                hookSettings.isInit = true;
                 return () => {
                     this.getEvent().remove(id);
                     this.getEvent().localBindedEvents.get(path)?.delete(id)
@@ -189,9 +175,6 @@ class Create<T extends object> {
 
     bind(path: NestedKeyOf<T>, autoUnbind?: boolean, rebind?: boolean) {
         try {
-            let settings = { isInit: true };
-            if (autoUnbind)
-                settings = refCondition(() => ({ isInit: false })).value;
             if (!this.getEvent().addedPaths.has(path) || rebind) {
                 this.getEvent().addedPaths.set(path, path);
                 let item = this;
@@ -209,8 +192,6 @@ class Create<T extends object> {
                         configurable: true,
                         get: () => v,
                         set: (value: any) => {
-                            if (!autoUnbind && !settings.isInit)
-                                return;
                             let newValue = { oldValue: v, newValue: value };
                             if (value !== v) {
                                 v = value;
@@ -223,7 +204,6 @@ class Create<T extends object> {
 
             if (autoUnbind) {
                 reactEffect(() => {
-                    settings.isInit = true;
                     () => this.unbind(path);
                 }, []);
             }
@@ -469,6 +449,10 @@ class StateBuilder<T extends object> {
             if ($this.onStateInit)
                 $this.onStateInit($this.initilized as any as T);
         }, [update.value])
+
+        reactEffect(() => {
+            $this.initilized.isMounted = true;
+        }, [])
 
         $this.initilized.resetState = () => {
             stateItem.setValue(undefined);

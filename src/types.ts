@@ -195,6 +195,8 @@ export type ReturnState<T extends object> = {
 export type LocalStateManagment<T extends object> = {
     /** reset the state to its original initiated value */
     resetState(): void;
+    //Usefull for local State 
+    isMounted?: boolean;
 }
 
 
