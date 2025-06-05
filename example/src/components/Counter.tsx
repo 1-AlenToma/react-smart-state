@@ -1,7 +1,9 @@
 import React from 'react';
-import buildState from 'react-smart-state';
+import buildState, { valid } from 'react-smart-state';
 import StateItem, { B } from "../testItems/StateItem";
 const display = (item: any, seen = new WeakSet(), indent = 0, k?: string): string => {
+  if (!valid(item, true))
+    return item;
   if (k == "selfRef")
     return "";
 
@@ -108,12 +110,15 @@ const TestSmartState = () => {
     el: undefined as undefined | any,
     derived: 0,
     items: [...arr],
-    items2: [new StateItem(), new StateItem(), new StateItem()]
+    items2: [new StateItem(), new StateItem(), new StateItem()],
+    createDate: new Date()
   })).onInit(fetch)
     .parseArray()
     .ignore("test.counter", "test.selfRef", "items.counter", "voices") // test .ignore()
     .localBind("test.counter", "items.counter") // bind local values
     .build();
+
+  console.log(state.createDate);
 
   const cmValue = state.useComputed((g, current) => {
     let v = g.itemA + 10 + g.test.counter;
@@ -164,7 +169,7 @@ const TestSmartState = () => {
         reset Array
       </button>
       <button onClick={() => {
-        state.items[0].counter++
+        state.items.forEach(x => x.counter++);
       }}>
         increase item.a
       </button>

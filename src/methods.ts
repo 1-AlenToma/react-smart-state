@@ -155,14 +155,22 @@ export const isArray = (item: any) => {
 }
 
 export const valid = (item: any, validArray?: boolean) => {
-    if (item == undefined || item === null) return false;
+    if (item === undefined || item === null) return false;
+
+    if (typeof item === "string") return false;
+    if (typeof item === "function") return false;
     if (item instanceof Set) return false;
     if (item instanceof Map) return false;
-    if (typeof item === "function") return false;
-    if (typeof item === "string") return false;
+    if (item instanceof WeakSet) return false;
+    if (item instanceof WeakMap) return false;
+    if (item instanceof Date) return false;
+    if (item instanceof RegExp) return false;
+    if (item instanceof ArrayBuffer) return false;
+    if (ArrayBuffer.isView(item)) return false; // covers Uint8Array, Float32Array, etc.
+    if (item instanceof Promise) return false;
     if (isArray(item) && item.length > 0) {
         if (validArray)
-            return valid(item[0]) as boolean;
+            return valid(item[0], validArray) as boolean;
         return false;
     }
     return typeof item === "object";

@@ -1,6 +1,6 @@
 {
   "name": "react-smart-state",
-  "version": "1.0.9-beta.6",
+  "version": "1.0.9",
   "description": "Next generation local and global state management",
   "author": "Alen Toma",
   "license": "MIT",
