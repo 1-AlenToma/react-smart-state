@@ -114,9 +114,11 @@ const TestSmartState = () => {
     createDate: new Date()
   })).onInit(fetch)
     .parseArray()
+    .ignoreUpdatesFor("test.counter")
     .ignore("test.counter", "test.selfRef", "items.counter", "voices") // test .ignore()
-    .localBind("test.counter", "items.counter") // bind local values
+
     .build();
+  //state.hook("items.counter")
 
   console.log(state.createDate);
 
@@ -158,6 +160,8 @@ const TestSmartState = () => {
       <LocalComponent state={state} />
 
       <button onClick={() => {
+        state.test.counter++;
+        return;
         if (state.item.item.counter <= 5)
           state.item.item.counter++
         else

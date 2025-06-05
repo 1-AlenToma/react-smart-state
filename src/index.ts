@@ -91,9 +91,12 @@ class Create<T extends object> {
         try {
             let id = refCondition<string>(newId).value;
             let mappedKeys = refCondition(() => toObject(...keys)).value;
+            const settings = refCondition(() => ({ isInit: false })).value;
             let state = reactRef({});
             this.getEvent().add(id, {
                 func: (items) => {
+                    if (!settings.isInit)
+                        return;
                     let newState = this.getEvent().hasChange(items, state.current);
                     if (newState.hasChanges)
                         fn(this)
@@ -103,6 +106,7 @@ class Create<T extends object> {
             });
 
             reactEffect(() => {
+                settings.isInit = true;
                 return () => this.getEvent().remove(id);
             }, [])
         } catch (e) {
@@ -185,6 +189,9 @@ class Create<T extends object> {
 
     bind(path: NestedKeyOf<T>, autoUnbind?: boolean, rebind?: boolean) {
         try {
+            let settings = { isInit: true };
+            if (autoUnbind)
+                settings = refCondition(() => ({ isInit: false })).value;
             if (!this.getEvent().addedPaths.has(path) || rebind) {
                 this.getEvent().addedPaths.set(path, path);
                 let item = this;
@@ -202,6 +209,8 @@ class Create<T extends object> {
                         configurable: true,
                         get: () => v,
                         set: (value: any) => {
+                            if (!autoUnbind && !settings.isInit)
+                                return;
                             let newValue = { oldValue: v, newValue: value };
                             if (value !== v) {
                                 v = value;
@@ -214,6 +223,7 @@ class Create<T extends object> {
 
             if (autoUnbind) {
                 reactEffect(() => {
+                    settings.isInit = true;
                     () => this.unbind(path);
                 }, []);
             }
@@ -470,7 +480,7 @@ class StateBuilder<T extends object> {
 
         // Rebind specified keys
         for (let key of $this.bindKeys) {
-            $this.initilized.bind(key);
+            $this.initilized.bind(key, true);
         }
 
         // Rebind keys locally
