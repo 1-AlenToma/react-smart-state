@@ -36,7 +36,7 @@
     "react": "*"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "*"
   },
   "files": [
     "dist",
