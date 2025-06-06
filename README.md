@@ -129,6 +129,17 @@ await state.batch(async () => {
 state.hook("value").on(v => v.value > 10);
 ```
 
+### PrimitiveValue and PrimitiveObject
+```ts
+import {  PrimitiveValue, PrimitiveObject } from 'react-smart-state';
+const [counter, setCounter] = PrimitiveValue(0);
+const txt = PrimitiveObject("test")
+
+setCounter(1);
+// counter -- unlike useState counter already is 1
+txt.value = "test"; // txt value is already test
+
+```
 ---
 
 ## 💡 Why Use react-smart-state?
