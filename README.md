@@ -136,8 +136,8 @@ const [counter, setCounter] = PrimitiveValue(0);
 const txt = PrimitiveObject("test")
 
 setCounter(1);
-// counter -- unlike useState counter already is 1
-txt.value = "test"; // txt value is already test
+
+txt.value = "test"; // unlike PrimitiveValue or useState value already is test even before render;
 
 ```
 ---
