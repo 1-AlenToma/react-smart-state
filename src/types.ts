@@ -9,7 +9,7 @@ type IsPlainObject<T> =
     : true
     : false;
 
-type Prev = [never, 0, 1, 2, 3, 4, 5];
+export type Prev = [never, 0, 1, 2, 3, 4, 5];
 
 export type NestedKeyOf<
     T,
@@ -31,6 +31,23 @@ export type NestedKeyOf<
     }[keyof T & string]
     : never;
 
+export type PrimitiveTypes = (Date | string | boolean | number | undefined | null);
+export type WidenLiteral<T, E> =
+    T extends string
+    ? string
+    : T extends number
+    ? number
+    : T extends boolean
+    ? boolean
+    : T extends Date ? Date : E;
+
+export type ISingleObject<T> = {
+    value: WidenLiteral<T, any>;
+}
+
+export type ISingleValue<T> = ISingleObject<T> & {
+    setValue: (newValue: WidenLiteral<T, PrimitiveTypes> | ((prev: WidenLiteral<T, PrimitiveTypes>) => WidenLiteral<T, PrimitiveTypes>)) => void
+}
 
 export interface IFastList<T, Key extends string | number | symbol = string> {
     // Core operations
@@ -79,6 +96,8 @@ export type IEventTrigger = {
     hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>): { hasChanges: boolean, parentState: any };
     seen: WeakMap<any, any>;
     hardIgnoreKeys: StateKeyTypeGenerator;
+    isMounted?: boolean;
+    resetState?: () => void;
 }
 
 export type SmartStateInstanceNames = "react-smart-state-array" | "react-smart-state-item";
@@ -196,7 +215,7 @@ export type LocalStateManagment<T extends object> = {
     /** reset the state to its original initiated value */
     resetState(): void;
     //Usefull for local State 
-    isMounted?: boolean;
+    readonly isMounted?: boolean;
 }
 
 

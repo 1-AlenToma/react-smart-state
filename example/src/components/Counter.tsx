@@ -1,5 +1,5 @@
 import React from 'react';
-import buildState, { valid } from 'react-smart-state';
+import buildState, { valid, PrimitiveValue, PrimitiveObject } from 'react-smart-state';
 import StateItem, { B } from "../testItems/StateItem";
 const display = (item: any, seen = new WeakSet(), indent = 0, k?: string): string => {
   if (!valid(item, true))
@@ -78,7 +78,7 @@ const fetch = async (g) => {
   item.counter = 1005;
   await sleep(1000);
   g.voices = item;
-  console.log(g.voices)
+  // console.log(g.voices)
 }
 
 
@@ -100,7 +100,7 @@ const LocalComponent = ({ state }: any) => {
 const TestSmartState = () => {
   // Hook usage for reaction (e.g., logging or effects)
   globalState.hook("item").on(g => g.item.counter >= 3);
-
+  const counter = PrimitiveObject(0);
   // Local state
   const state = buildState(() => ({
     itemA: 0,
@@ -118,9 +118,7 @@ const TestSmartState = () => {
     .ignore("test.counter", "test.selfRef", "items.counter", "voices") // test .ignore()
 
     .build();
-  //state.hook("items.counter")
 
-  console.log(state.createDate);
 
   const cmValue = state.useComputed((g, current) => {
     let v = g.itemA + 10 + g.test.counter;
@@ -148,9 +146,16 @@ const TestSmartState = () => {
   }, "counter");
 
 
-  console.log("item.a.Updated", state.item.a)
   return (
     <div style={{ fontFamily: "monospace" }}>
+      <h3>PrimitiveValue</h3>
+      <pre>{counter.value}</pre>
+      <button onClick={() => {
+        counter.value++;
+        console.log(JSON.stringify(counter), "isMounted", state.isMounted)
+      }}>
+        increase Primitive Value
+      </button>
       <h3>Local State</h3>
       <pre>{display(state)}</pre>
       <h3>Global State</h3>

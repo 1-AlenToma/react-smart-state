@@ -45,6 +45,8 @@ export class EventTrigger implements IEventTrigger {
     seen: WeakMap<any, any> = new WeakMap();
     ignoreKeys: StateKeyTypeGenerator;
     hardIgnoreKeys: StateKeyTypeGenerator;
+    isMounted?: boolean;
+    resetState?: () => void;
 
     constructor(ignoredKeys: Record<string, boolean>, hardIgnoreKeys: Record<string, boolean>) {
         this.ignoreKeys = ignoredKeys ?? {};

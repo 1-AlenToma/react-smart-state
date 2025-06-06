@@ -1,6 +1,6 @@
 import { clone, getItem, getValueByPath, isArray, isSame, keys, newId, reactEffect, reactRef, reactState, refCondition, SmartStateError, toObject, updater, valid } from "./methods";
 import { EventTrigger, FastList, ObservableArray } from "./objects";
-import { CreateItem, IEventTrigger, LocalStateManagment, NestedKeyOf, ReturnState, SmartStateInstanceNames } from "./types";
+import { CreateItem, IEventTrigger, ISingleObject, ISingleValue, LocalStateManagment, NestedKeyOf, PrimitiveTypes, ReturnState, SmartStateInstanceNames, WidenLiteral } from "./types";
 export * from "./methods";
 export * from "./types";
 export * from "./objects";
@@ -22,6 +22,12 @@ class Create<T extends object> {
         } finally {
             enable();
         }
+    }
+
+    resetState() {
+        if (this.getEvent().stateType == "Global")
+            throw SmartStateError("resetState is not implemented in globalState, only on local state", { code: "resetState" });
+        return this.getEvent().resetState?.();
     }
 
     hook(...keys: NestedKeyOf<T>[]) {
@@ -441,6 +447,16 @@ class StateBuilder<T extends object> {
                 ? undefined
                 : $this.timeoutSpeed;
 
+            Object.defineProperty($this.initilized, "isMounted", {
+                get() {
+                    if ($this.initilized.getEvent().stateType === "Global") {
+                        throw SmartStateError("isMounted is not implemented in globalState, only on local state", { code: "isMounted" });
+                    }
+                    return $this.initilized.getEvent().isMounted ?? false;
+                },
+                enumerable: false, // 🔒 hides it from JSON.stringify and for..in
+            });
+
             $this.initilized.getEvent().stateType = "Local";
 
         }
@@ -451,10 +467,10 @@ class StateBuilder<T extends object> {
         }, [update.value])
 
         reactEffect(() => {
-            $this.initilized.isMounted = true;
+            $this.initilized.getEvent().isMounted = true;
         }, [])
 
-        $this.initilized.resetState = () => {
+        $this.initilized.getEvent().resetState = () => {
             stateItem.setValue(undefined);
             update.refresh();
         }
@@ -504,6 +520,27 @@ class StateBuilder<T extends object> {
 
 const StateManagment = <T extends object>(item: T | (() => T)) => {
     return new StateBuilder<T>(item);
+};
+
+export const PrimitiveValue = <
+    T extends PrimitiveTypes
+>(initialValue?: T) => {
+    const state = new StateBuilder<ISingleValue<T>>(() => ({ value: initialValue }) as any).build();
+    state.setValue = (newValue) => {
+        state.value = (typeof newValue === "function" ? (newValue as (prev) => any)(state.value) : newValue)
+    };
+
+
+
+    return [state.value, state.setValue] as const;
+};
+
+export const PrimitiveObject = <
+    T extends PrimitiveTypes
+>(initialValue?: T) => {
+    const state = new StateBuilder<ISingleObject<T>>(() => ({ value: initialValue }) as any).build();
+
+    return state as ISingleObject<T>;
 };
 
 export default StateManagment;
