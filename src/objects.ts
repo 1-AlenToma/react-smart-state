@@ -122,7 +122,7 @@ export class EventTrigger implements IEventTrigger {
 
     async onChange(key: string, { oldValue, newValue }) {
         try {
-            clearTimeout(this.timer); // Proper debouncing
+         //   clearTimeout(this.timer); // Proper debouncing
             // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
             const parts = key.split(".");
             for (const [eventId, event] of Object.entries(this.events)) {
