@@ -115,8 +115,7 @@ const TestSmartState = () => {
   })).onInit(fetch)
     .parseArray()
     .ignoreUpdatesFor("test.counter")
-    .ignore("test.counter", "test.selfRef", "items.counter", "voices") // test .ignore()
-
+    .ignore("test.counter", "test.selfRef", "items.counter", "voices", "item") // test .ignore()
     .build();
 
 
@@ -139,6 +138,11 @@ const TestSmartState = () => {
     //alert(44)
     state.derived = state.itemA + state.test.counter;
   }, "itemA", "test.counter");
+
+  state.useEffect(() => {
+    //alert(44)
+    console.log("item updated")
+  }, "item.a");
 
   // Global state reaction
   globalState.useEffect(() => {
@@ -178,7 +182,12 @@ const TestSmartState = () => {
         reset Array
       </button>
       <button onClick={() => {
-        state.items.forEach(x => x.counter++);
+        state.item = { a: 0, item: new StateItem() }
+      }}>
+        reset item
+      </button>
+      <button onClick={() => {
+        state.item.a++;
       }}>
         increase item.a
       </button>

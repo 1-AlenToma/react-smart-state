@@ -30,11 +30,10 @@ export class CustomError extends Error {
             stack: this.stack,
         };
     }
-
 }
 
 export class EventTrigger implements IEventTrigger {
-    events: Record<string, EventItem> = {};
+    private events: Map<string, EventItem> = new Map();
     timer: any = undefined;
     waitingEvents: IFastList<{ event: EventItem, items: IFastList<WaitngItem> }> = new FastList();
     addedPaths: IFastList<string> = new FastList();
@@ -55,11 +54,11 @@ export class EventTrigger implements IEventTrigger {
 
     add(id: string, item: EventItem) {
         item.type = item.type ?? "Auto";
-        this.events[id] = item;
+        this.events.set(id, item);
     }
 
     remove(id: string) {
-        delete this.events[id];
+        this.events.delete(id);
     }
 
     hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>) {
@@ -105,7 +104,6 @@ export class EventTrigger implements IEventTrigger {
     }
 
     async trigger(event: { eventId: string, event: EventItem }, key: string, oldValue: any, newValue: any) {
-        clearTimeout(this.timer); // Proper debouncing
         const { eventId, event: evt } = event;
 
         const waitingItems = (this.waitingEvents.has(eventId) ? this.waitingEvents.get(eventId) : this.waitingEvents.set(eventId, {
@@ -116,30 +114,26 @@ export class EventTrigger implements IEventTrigger {
         waitingItems.set(key, { key, oldValue, newValue });
         if (this.batching.size > 0)
             return;
-        this.triggerSavedChanges();
-
+        await this.triggerSavedChanges();
     }
 
-    async onChange(key: string, { oldValue, newValue }) {
+    async onChange(key: string, { oldValue, newValue }, fromBind: boolean = false) {
         try {
-         //   clearTimeout(this.timer); // Proper debouncing
             // if the child of the hooked key is changes, then hook should still trigger if there is a hook for it
-            const parts = key.split(".");
-            for (const [eventId, event] of Object.entries(this.events)) {
-                let foundPartKey = event.keys._keys?.find(x => x.startsWith(key + "."));
-                if ((event.keys.AllKeys && !this.addedPaths.has(key) && !this.hardIgnoreKeys[key]) || event.keys[key] || foundPartKey) {
-                    this.trigger({ eventId, event }, key, oldValue, newValue);
-                    continue;
+            //   const parts = key.split(".");
+            for (const [eventId, event] of this.events) {
+                if ((event.keys.AllKeys && !this.hardIgnoreKeys[key] && (event.type == "Path" || !fromBind)) || (event.keys[key] || event.keys[key + "."])) {
+                    await this.trigger({ eventId, event }, key, oldValue, newValue);
                 }
 
                 // Traverse up the key chain: "a.b.c" → "a.b" → "a"
-                for (let i = parts.length - 1; i > 0; i--) {
-                    const parentKey = parts.slice(0, i).join(".");
-                    if (event.keys[parentKey]) {
-                        this.trigger({ eventId, event }, key, oldValue, newValue);
-                        break; // stop at the first match for performance
-                    }
-                }
+                /*   for (let i = parts.length - 1; i > 0; i--) {
+                       const parentKey = parts.slice(0, i).join(".");
+                       if (event.keys[parentKey]) {
+                           this.trigger({ eventId, event }, key, oldValue, newValue);
+                           break; // stop at the first match for performance
+                       }
+                   }*/
             }
         } catch (e) {
             console.error(e);

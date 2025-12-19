@@ -92,7 +92,7 @@ export type IEventTrigger = {
     add(id: string, item: EventItem): void;
     remove(id: string): void;
     triggerSavedChanges(): void;
-    onChange(key: string, { oldValue, newValue }): void;
+    onChange(key: string, { oldValue, newValue }, fromBind?: boolean): void;
     hasChange(items: Record<string, WaitngItem>, parentState: Record<string, any>): { hasChanges: boolean, parentState: any };
     seen: WeakMap<any, any>;
     hardIgnoreKeys: StateKeyTypeGenerator;

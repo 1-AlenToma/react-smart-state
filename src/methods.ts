@@ -94,13 +94,25 @@ export function refCondition<T>(fn: () => T) {
 }
 
 
-export const toObject = (...keys: string[]) => {
+export const toObject = (nested: boolean = false, ...keys: string[]) => {
     if (keys.length === 0) return { AllKeys: true, _keys: keys } as any as StateKeyTypeGenerator;
 
-    return keys.reduce((c, v) => {
+    let item = keys.reduce((c, v) => {
         c[v] = true;
+        if (nested) {
+            let parts = v.split(".");
+            if (parts.length > 1) {
+                let fullKey = "";
+                for (let p of parts) {
+                    fullKey += p + ".";
+                    c[fullKey] = true;
+                }
+            }
+        }
         return c;
     }, { _keys: keys } as any as StateKeyTypeGenerator);
+
+    return item;
 };
 
 export function getPrototypeChain(obj) {

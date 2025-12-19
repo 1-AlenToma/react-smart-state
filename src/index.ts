@@ -33,7 +33,7 @@ class Create<T extends object> {
     hook(...keys: NestedKeyOf<T>[]) {
         try {
             let id = refCondition<string>(newId).value;
-            let mappedKeys = refCondition(() => toObject(...keys)).value
+            let mappedKeys = refCondition(() => toObject(true, ...keys)).value
             let [state, setState] = reactState({});
             let hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
             this.getEvent().add(id, {
@@ -64,7 +64,7 @@ class Create<T extends object> {
     useComputed<B>(fn: (item: T, currentValue?: T) => B, ...keys: NestedKeyOf<T>[]) {
         try {
             let id = refCondition<string>(newId).value;
-            let mappedKeys = refCondition(() => toObject(...keys)).value
+            let mappedKeys = refCondition(() => toObject(true, ...keys)).value
             let [state, setState] = reactState(fn(this as any, undefined));
 
             this.getEvent().add(id, {
@@ -89,7 +89,7 @@ class Create<T extends object> {
     useEffect(fn: Function, ...keys: NestedKeyOf<T>[]) {
         try {
             let id = refCondition<string>(newId).value;
-            let mappedKeys = refCondition(() => toObject(...keys)).value;
+            let mappedKeys = refCondition(() => toObject(true, ...keys)).value;
             let state = reactRef({});
             this.getEvent().add(id, {
                 func: (items) => {
@@ -139,7 +139,7 @@ class Create<T extends object> {
             const [state, setState] = reactState();
             const id = refCondition(newId).value;
             const hookSettings = refCondition(() => ({ on: undefined as ((item: any) => boolean) | undefined })).value;
-            const mappedKeys = refCondition(() => toObject(path)).value;
+            const mappedKeys = refCondition(() => toObject(true, path)).value;
             if (!this.getEvent().localBindedEvents.has(path)) {
                 this.getEvent().localBindedEvents.set(path, new FastList<boolean>());
                 this.bind(path);
@@ -191,6 +191,17 @@ class Create<T extends object> {
                     } else break;
                 }
 
+                let { ignoreKeys } = this.getEvent();
+                let oKeys = toObject(true, ...ignoreKeys._keys);
+
+                let fromBind = false;
+                for (let k of path.split("."))
+                    if (oKeys[k]) {
+                        fromBind = true;
+                        break;
+                    }
+
+
                 if (item && !isArray(item) && valid(item)) {
                     let v = item[key];
                     Object.defineProperty(item, key, {
@@ -201,7 +212,7 @@ class Create<T extends object> {
                             let newValue = { oldValue: v, newValue: value };
                             if (value !== v) {
                                 v = value;
-                                this.getEvent().onChange(path, newValue);
+                                this.getEvent().onChange(path, newValue, fromBind);
                             }
                         }
                     });
@@ -437,8 +448,8 @@ class StateBuilder<T extends object> {
         if ($this.initilized === undefined) {
             $this.initilized = new Create({
                 item: getItem($this.item),
-                ignoreKeys: toObject(...$this.ignoreKeys),
-                hardIgnoreKeys: toObject(...$this.hardIgnoreKeys),
+                ignoreKeys: toObject(false, ...$this.ignoreKeys),
+                hardIgnoreKeys: toObject(false, ...$this.hardIgnoreKeys),
                 arrayParser: this.arrayParser ?? false
             }) as any;
 
@@ -499,8 +510,8 @@ class StateBuilder<T extends object> {
         if (this.initilized === undefined) {
             this.initilized = new Create({
                 item: getItem(this.item),
-                ignoreKeys: toObject(...this.ignoreKeys),
-                hardIgnoreKeys: toObject(...this.hardIgnoreKeys),
+                ignoreKeys: toObject(false, ...this.ignoreKeys),
+                hardIgnoreKeys: toObject(false, ...this.hardIgnoreKeys),
                 arrayParser: this.arrayParser ?? false
             }) as any;
 
