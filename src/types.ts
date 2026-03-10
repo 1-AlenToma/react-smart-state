@@ -89,7 +89,7 @@ export type IEventTrigger = {
     batching: IFastList<Function, number>;
     speed?: number;
     stateType: StateType;
-    add(id: string, item: EventItem): void;
+    add(id: string, item: EventItem, ...state: any[]): void;
     remove(id: string): void;
     triggerSavedChanges(): void;
     onChange(key: string, { oldValue, newValue }, fromBind?: boolean): void;
@@ -120,6 +120,7 @@ export type EventItem = {
     func: (item: Record<string, WaitngItem>) => void,
     item?: any;
     type?: "Auto" | "Path";
+    prevState?: any[];
 };
 
 /**

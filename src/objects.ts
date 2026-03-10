@@ -52,8 +52,25 @@ export class EventTrigger implements IEventTrigger {
         this.hardIgnoreKeys = hardIgnoreKeys ?? {};
     }
 
-    add(id: string, item: EventItem) {
+    add(id: string, item: EventItem, ...state: any[]) {
         item.type = item.type ?? "Auto";
+        let prevItem = this.events.get(id);
+        if (prevItem && prevItem.prevState) {
+            if (prevItem.prevState.length === state.length) {
+                let changed = false;
+                for (let i = 0; i < state.length; i++) {
+                    if (state[i] !== prevItem.prevState[i]) {
+                        changed = true;
+                        break;
+                    }
+                }
+
+                if (!changed)
+                    return;
+
+            }
+        }
+        item.prevState = state;
         this.events.set(id, item);
     }
 

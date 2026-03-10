@@ -44,7 +44,7 @@ class Create<T extends object> {
                         setState({ ...newState.parentState });
                 },
                 keys: mappedKeys
-            });
+            }, state);
 
             reactEffect(() => {
                 return () => this.getEvent().remove(id);
@@ -74,7 +74,7 @@ class Create<T extends object> {
                         setState(newValue);
                 },
                 keys: mappedKeys
-            });
+            }, state);
 
             reactEffect(() => {
                 return () => this.getEvent().remove(id);
@@ -99,7 +99,7 @@ class Create<T extends object> {
                     state.current = newState.parentState;
                 },
                 keys: mappedKeys
-            });
+            }, state.current, fn);
 
             reactEffect(() => {
                 return () => this.getEvent().remove(id);
@@ -154,7 +154,7 @@ class Create<T extends object> {
                 },
                 keys: mappedKeys,
                 type: "Path"
-            });
+            }, state);
 
             reactEffect(() => {
                 return () => {
