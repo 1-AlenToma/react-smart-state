@@ -16,6 +16,9 @@ Unlike Redux, Zustand, Recoil, or Jotai, this library removes boilerplate, offer
 ```bash
 npm install react-smart-state
 ```
+## strictMode
+
+Note `react-smart-state` dose not work well with `strictMode` so remove `React.StrictMode` if you have it.
 
 ---
 
